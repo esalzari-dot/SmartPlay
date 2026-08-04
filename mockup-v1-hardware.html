@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Smart Chord & Arpeggiator — UI Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --panel:#1C1B19;
+    --panel-inset:#262421;
+    --panel-raised:#2E2B27;
+    --seam:#0E0D0C;
+    --text:#EDE8DE;
+    --text-muted:#8A8478;
+
+    --piano:#E8DFC8;
+    --piano-dim:#5a5548;
+    --bass:#C85A34;
+    --bass-dim:#5a3226;
+    --guitar:#C89B3C;
+    --guitar-dim:#5a4a26;
+    --strings:#7FA0B5;
+    --strings-dim:#334652;
+
+    --accent: var(--guitar);
+    --accent-dim: var(--guitar-dim);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#0a0a09;
+    font-family:'IBM Plex Sans',sans-serif;
+    color:var(--text);
+  }
+
+  .plugin{
+    width:920px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.15)),
+      var(--panel);
+    border-radius:10px;
+    border:1px solid var(--seam);
+    box-shadow:0 30px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04);
+    overflow:hidden;
+  }
+
+  /* HEADER */
+  .header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 22px;
+    background:var(--seam);
+    border-bottom:1px solid rgba(255,255,255,0.05);
+  }
+  .brand{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    letter-spacing:2px;
+    font-size:15px;
+    text-transform:uppercase;
+    color:var(--text);
+  }
+  .brand span{color:var(--accent); transition:color .35s;}
+  .header-right{
+    display:flex;
+    align-items:center;
+    gap:18px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--text-muted);
+  }
+  .led{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 8px var(--accent);
+    display:inline-block;margin-right:6px;
+    transition:background .35s, box-shadow .35s;
+  }
+  .panic{
+    font-family:'Oswald',sans-serif;
+    font-size:11px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-muted);
+    border:1px solid rgba(255,255,255,0.12);
+    padding:6px 12px;border-radius:4px;
+    cursor:pointer;
+    transition:all .15s;
+  }
+  .panic:hover{border-color:var(--bass); color:var(--bass);}
+
+  /* BODY LAYOUT */
+  .body{
+    display:grid;
+    grid-template-columns:1fr 300px;
+    gap:1px;
+    background:rgba(255,255,255,0.05);
+  }
+  .col{background:var(--panel); padding:22px;}
+
+  .section-title{
+    font-family:'Oswald',sans-serif;
+    font-size:11px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:var(--text-muted);
+    margin:0 0 14px 0;
+  }
+
+  /* CHORD PADS */
+  .pad-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+  }
+  .pad{
+    aspect-ratio:1.3/1;
+    background:linear-gradient(180deg, var(--panel-raised), var(--panel-inset));
+    border-radius:6px;
+    border:1px solid rgba(255,255,255,0.06);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 3px 6px rgba(0,0,0,0.3);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;
+    position:relative;
+    transition:all .12s;
+    user-select:none;
+  }
+  .pad:hover{transform:translateY(-1px);}
+  .pad .root{
+    font-family:'Oswald',sans-serif;
+    font-size:20px; font-weight:500;
+    color:var(--text);
+  }
+  .pad .quality{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    color:var(--text-muted);
+    margin-top:2px;
+    letter-spacing:.5px;
+  }
+  .pad .slot-num{
+    position:absolute; top:6px; left:8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:9px; color:rgba(255,255,255,0.25);
+  }
+  .pad.active{
+    background:linear-gradient(180deg, var(--accent), var(--accent-dim));
+    border-color:var(--accent);
+    box-shadow:0 0 18px -2px var(--accent), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .pad.active .root, .pad.active .quality{color:#1C1B19;}
+  .pad.active .quality{color:rgba(28,27,25,0.6);}
+
+  /* ARP CONTROLS */
+  .arp-controls{
+    margin-top:26px;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+  }
+  .knob-block{text-align:center;}
+  .knob{
+    width:52px;height:52px;
+    margin:0 auto 8px auto;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--panel-raised), var(--panel-inset) 70%);
+    border:1px solid rgba(255,255,255,0.08);
+    position:relative;
+    box-shadow:0 2px 6px rgba(0,0,0,0.4);
+  }
+  .knob::after{
+    content:'';
+    position:absolute;
+    top:5px;left:50%;
+    width:2px;height:16px;
+    background:var(--accent);
+    transform:translateX(-50%) rotate(35deg);
+    transform-origin:bottom center;
+    border-radius:2px;
+    transition:background .35s;
+  }
+  .knob-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;color:var(--text-muted); letter-spacing:.5px;
+  }
+  .knob-value{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;color:var(--text); margin-top:2px;
+  }
+
+  /* RIGHT COLUMN — FAMILY + PATTERNS */
+  .family-tabs{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:20px;
+  }
+  .family-tab{
+    padding:10px 8px;
+    text-align:center;
+    border-radius:5px;
+    border:1px solid rgba(255,255,255,0.08);
+    background:var(--panel-inset);
+    font-family:'Oswald',sans-serif;
+    font-size:11px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:all .15s;
+  }
+  .family-tab .dot{
+    display:inline-block;width:6px;height:6px;border-radius:50%;
+    margin-right:6px;position:relative;top:-1px;
+  }
+  .family-tab[data-fam="piano"] .dot{background:var(--piano);}
+  .family-tab[data-fam="bass"] .dot{background:var(--bass);}
+  .family-tab[data-fam="guitar"] .dot{background:var(--guitar);}
+  .family-tab[data-fam="strings"] .dot{background:var(--strings);}
+  .family-tab.selected{
+    background:var(--panel-raised);
+    color:var(--text);
+    border-color:var(--accent);
+  }
+
+  .pattern-list{display:flex; flex-direction:column; gap:6px;}
+  .pattern-item{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 12px;
+    background:var(--panel-inset);
+    border-radius:5px;
+    border:1px solid transparent;
+    cursor:pointer;
+    transition:all .15s;
+  }
+  .pattern-item:hover{border-color:rgba(255,255,255,0.1);}
+  .pattern-item.selected{
+    background:var(--panel-raised);
+    border-color:var(--accent);
+  }
+  .pattern-item .name{font-size:13px; color:var(--text);}
+  .pattern-item .rhythm-dots{display:flex; gap:3px;}
+  .rhythm-dots span{
+    width:4px;height:4px;border-radius:50%;
+    background:rgba(255,255,255,0.15);
+  }
+  .pattern-item.selected .rhythm-dots span{background:var(--accent);}
+
+  .footer{
+    padding:12px 22px;
+    background:var(--seam);
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;color:var(--text-muted);
+    letter-spacing:.5px;
+  }
+  .footer .out-route{color:var(--text);}
+  .footer .out-route b{color:var(--accent); transition:color .35s;}
+</style>
+</head>
+<body>
+
+<div class="plugin">
+  <div class="header">
+    <div class="brand">SMART CHORD <span>&</span> ARPEGGIATOR</div>
+    <div class="header-right">
+      <span><span class="led"></span>SYNCED · 120 BPM</span>
+      <span>1/16 · SWING 12%</span>
+      <div class="panic" onclick="allNotesOff()">PANIC</div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="col">
+      <div class="section-title">Chord Bank</div>
+      <div class="pad-grid" id="padGrid"></div>
+
+      <div class="arp-controls">
+        <div class="knob-block">
+          <div class="knob"></div>
+          <div class="knob-label">RATE</div>
+          <div class="knob-value">1/16</div>
+        </div>
+        <div class="knob-block">
+          <div class="knob"></div>
+          <div class="knob-label">GATE</div>
+          <div class="knob-value">78%</div>
+        </div>
+        <div class="knob-block">
+          <div class="knob"></div>
+          <div class="knob-label">SWING</div>
+          <div class="knob-value">12%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="section-title">Instrument Family</div>
+      <div class="family-tabs" id="familyTabs"></div>
+
+      <div class="section-title">Pattern</div>
+      <div class="pattern-list" id="patternList"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>MIDI OUT → <span class="out-route" id="outRoute"><b>External VST</b> · Guitar Instrument</span></span>
+    <span>SMART CHORD & ARP v0.1</span>
+  </div>
+</div>
+
+<script>
+const chords = [
+  {root:'C', q:'maj'}, {root:'G', q:'maj'}, {root:'A', q:'min'}, {root:'F', q:'maj'},
+  {root:'D', q:'min7'}, {root:'E', q:'min'}, {root:'B', q:'dim'}, {root:'C', q:'maj7'}
+];
+
+const families = [
+  {id:'piano', label:'Piano'},
+  {id:'bass', label:'Bass'},
+  {id:'guitar', label:'Guitar'},
+  {id:'strings', label:'Strings'}
+];
+
+const patterns = {
+  piano:   [{name:'Broken Chord Classic', steps:4},{name:'Alberti Bass', steps:4},{name:'Up · Down', steps:4}],
+  bass:    [{name:'Walking Pop', steps:4},{name:'Root-Fifth Alternato', steps:2},{name:'As Played', steps:3}],
+  guitar:  [{name:'Strumming Simulato', steps:1},{name:'Travis Picking', steps:8},{name:'Up · Down', steps:4}],
+  strings: [{name:'Sostenuto Legato', steps:3},{name:'Tremolo Pizzicato', steps:4},{name:'Order', steps:4}]
+};
+
+const instrumentNames = { piano:'Piano Instrument', bass:'Bass Instrument', guitar:'Guitar Instrument', strings:'Strings Instrument' };
+
+let activeFamily = 'guitar';
+let activePad = 0;
+let activePatternIdx = {piano:0, bass:0, guitar:0, strings:0};
+
+const padGrid = document.getElementById('padGrid');
+const familyTabs = document.getElementById('familyTabs');
+const patternList = document.getElementById('patternList');
+const outRoute = document.getElementById('outRoute');
+const root = document.documentElement;
+
+function renderPads(){
+  padGrid.innerHTML = '';
+  chords.forEach((c,i)=>{
+    const pad = document.createElement('div');
+    pad.className = 'pad' + (i===activePad ? ' active':'');
+    pad.innerHTML = `<span class="slot-num">${i+1}</span><span class="root">${c.root}</span><span class="quality">${c.q}</span>`;
+    pad.onclick = ()=>{ activePad = i; renderPads(); };
+    padGrid.appendChild(pad);
+  });
+}
+
+function renderFamilyTabs(){
+  familyTabs.innerHTML = '';
+  families.forEach(f=>{
+    const tab = document.createElement('div');
+    tab.className = 'family-tab' + (f.id===activeFamily?' selected':'');
+    tab.setAttribute('data-fam', f.id);
+    tab.innerHTML = `<span class="dot"></span>${f.label}`;
+    tab.onclick = ()=>{ activeFamily = f.id; applyFamilyAccent(); renderFamilyTabs(); renderPatterns(); };
+    familyTabs.appendChild(tab);
+  });
+}
+
+function renderPatterns(){
+  patternList.innerHTML = '';
+  patterns[activeFamily].forEach((p, idx)=>{
+    const item = document.createElement('div');
+    item.className = 'pattern-item' + (idx===activePatternIdx[activeFamily] ? ' selected':'');
+    let dots = '';
+    for(let i=0;i<Math.min(p.steps,8);i++){ dots += '<span></span>'; }
+    item.innerHTML = `<span class="name">${p.name}</span><span class="rhythm-dots">${dots}</span>`;
+    item.onclick = ()=>{ activePatternIdx[activeFamily] = idx; renderPatterns(); };
+    patternList.appendChild(item);
+  });
+  outRoute.innerHTML = `<b>External VST</b> · ${instrumentNames[activeFamily]}`;
+}
+
+function applyFamilyAccent(){
+  const map = {
+    piano:   ['--piano','--piano-dim'],
+    bass:    ['--bass','--bass-dim'],
+    guitar:  ['--guitar','--guitar-dim'],
+    strings: ['--strings','--strings-dim']
+  };
+  const [c, cd] = map[activeFamily];
+  root.style.setProperty('--accent', `var(${c})`);
+  root.style.setProperty('--accent-dim', `var(${cd})`);
+}
+
+function allNotesOff(){
+  activePad = null;
+  renderPads();
+}
+
+renderPads();
+renderFamilyTabs();
+renderPatterns();
+applyFamilyAccent();
+</script>
+
+</body>
+</html>

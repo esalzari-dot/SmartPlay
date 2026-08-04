@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Smart Chord & Arpeggiator — GarageBand-style Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EDEFF2;
+    --panel:#FFFFFF;
+    --panel-edge:#DADFE5;
+    --text:#1C1E21;
+    --text-muted:#8A909B;
+
+    --piano:#4F9DDE;
+    --piano-dark:#2E75B6;
+    --bass:#E8734A;
+    --bass-dark:#C24E27;
+    --guitar:#3FBF8F;
+    --guitar-dark:#249A6E;
+    --strings:#9B7FE0;
+    --strings-dark:#7857C4;
+
+    --accent: var(--guitar);
+    --accent-dark: var(--guitar-dark);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    background:#dcdfe3;
+    font-family:'Inter',system-ui,sans-serif;
+    color:var(--text);
+  }
+
+  .plugin{
+    width:820px;
+    background:var(--bg);
+    border-radius:18px;
+    border:1px solid var(--panel-edge);
+    box-shadow:0 25px 60px rgba(0,0,0,0.18);
+    overflow:hidden;
+  }
+
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 20px;
+    background:var(--panel);
+    border-bottom:1px solid var(--panel-edge);
+  }
+  .title{
+    font-weight:700; font-size:15px; letter-spacing:-.2px;
+  }
+  .transport{
+    display:flex;align-items:center;gap:10px;
+    font-size:12px; color:var(--text-muted); font-weight:500;
+  }
+  .tempo-pill{
+    background:var(--bg);
+    border:1px solid var(--panel-edge);
+    padding:5px 12px;border-radius:999px;
+    font-variant-numeric:tabular-nums;
+  }
+  .autoplay-toggle{
+    display:flex;align-items:center;gap:6px;
+    background:var(--accent);
+    color:#fff; font-weight:600; font-size:12px;
+    padding:6px 14px;border-radius:999px;
+    cursor:pointer;
+    transition:background .3s;
+  }
+  .autoplay-toggle .dot{width:6px;height:6px;border-radius:50%;background:#fff;}
+
+  /* INSTRUMENT FAMILY SWITCHER (segmented, iOS-style) */
+  .family-row{
+    padding:16px 20px 0 20px;
+  }
+  .segmented{
+    display:grid; grid-template-columns:repeat(4,1fr);
+    background:var(--panel-edge);
+    border-radius:12px; padding:3px; gap:3px;
+  }
+  .segment{
+    text-align:center; padding:9px 0;
+    border-radius:9px;
+    font-size:13px; font-weight:600;
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:all .15s;
+    background:transparent;
+  }
+  .segment.selected{
+    background:var(--panel);
+    color:var(--text);
+    box-shadow:0 1px 3px rgba(0,0,0,0.12);
+  }
+
+  /* CHORD BUTTON ROW */
+  .chord-row{
+    padding:18px 20px 6px 20px;
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    gap:8px;
+  }
+  .chord-btn{
+    background:var(--panel);
+    border:2px solid transparent;
+    border-radius:12px;
+    padding:12px 0;
+    text-align:center;
+    cursor:pointer;
+    box-shadow:0 1px 2px rgba(0,0,0,0.08);
+    transition:all .12s;
+  }
+  .chord-btn .r{font-size:17px;font-weight:700;}
+  .chord-btn .q{font-size:10px;color:var(--text-muted);font-weight:500;margin-top:1px;}
+  .chord-btn.selected{
+    background:var(--accent);
+    border-color:var(--accent-dark);
+  }
+  .chord-btn.selected .r, .chord-btn.selected .q{color:#fff;}
+
+  /* AUTOPLAY GRID — signature GarageBand element:
+     colonne = accordi, righe = intensità pattern (dal semplice in basso al complesso in alto) */
+  .autoplay-section{padding:14px 20px 20px 20px;}
+  .autoplay-label-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    margin-bottom:8px;
+  }
+  .autoplay-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);}
+  .autoplay-hint{font-size:11px;color:var(--text-muted);}
+
+  .autoplay-grid{
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    grid-template-rows:repeat(4,1fr);
+    gap:4px;
+    height:200px;
+    background:var(--panel);
+    border-radius:14px;
+    padding:8px;
+    box-shadow:inset 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .cell{
+    border-radius:6px;
+    background:#F3F4F6;
+    cursor:pointer;
+    transition:all .1s;
+  }
+  .cell:hover{background:#E7E9EC;}
+  .cell.active-col{background:#EDF6F1;}
+  .cell.selected{
+    background:var(--accent);
+  }
+  .row-label{
+    grid-column:span 8;
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+  }
+
+  .intensity-caption{
+    display:flex;justify-content:space-between;
+    margin-top:6px;
+    font-size:10px;color:var(--text-muted);
+  }
+
+  /* BOTTOM: pattern name readout, like GarageBand's autoplay pattern name pill */
+  .pattern-readout{
+    margin-top:14px;
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--panel);
+    border-radius:12px;
+    padding:12px 16px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.06);
+  }
+  .pattern-readout .name{font-weight:700;font-size:14px;}
+  .pattern-readout .sub{font-size:11px;color:var(--text-muted); margin-top:2px;}
+  .pattern-readout .route{
+    font-size:11px; color:var(--accent-dark); font-weight:600;
+    background:color-mix(in srgb, var(--accent) 15%, white);
+    padding:5px 10px;border-radius:999px;
+  }
+</style>
+</head>
+<body>
+
+<div class="plugin">
+  <div class="topbar">
+    <div class="title">Smart Chord & Arpeggiator</div>
+    <div class="transport">
+      <span class="tempo-pill" id="tempoPill">120 BPM · 1/16</span>
+      <div class="autoplay-toggle" id="autoplayToggle"><span class="dot"></span>Autoplay</div>
+    </div>
+  </div>
+
+  <div class="family-row">
+    <div class="segmented" id="segmented"></div>
+  </div>
+
+  <div class="chord-row" id="chordRow"></div>
+
+  <div class="autoplay-section">
+    <div class="autoplay-label-row">
+      <span class="autoplay-label">Autoplay</span>
+      <span class="autoplay-hint">Tocca per intensità pattern · Alto = più complesso</span>
+    </div>
+    <div class="autoplay-grid" id="autoplayGrid"></div>
+    <div class="intensity-caption">
+      <span>Semplice</span><span>Complesso</span>
+    </div>
+  </div>
+
+  <div style="padding:0 20px 20px 20px;">
+    <div class="pattern-readout">
+      <div>
+        <div class="name" id="patternName">Strumming Simulato</div>
+        <div class="sub" id="patternSub">Chitarra · Intensità 2/4</div>
+      </div>
+      <div class="route" id="routeLabel">→ VST Chitarra</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const chords = [
+  {root:'C', q:'maj'}, {root:'G', q:'maj'}, {root:'A', q:'min'}, {root:'F', q:'maj'},
+  {root:'D', q:'min7'}, {root:'E', q:'min'}, {root:'B', q:'dim'}, {root:'Cmaj7', q:'7'}
+];
+
+const families = [
+  {id:'piano', label:'Piano'},
+  {id:'bass', label:'Bass'},
+  {id:'guitar', label:'Guitar'},
+  {id:'strings', label:'Strings'}
+];
+
+// 4 livelli di intensità per famiglia, dal più semplice (riga 0, in basso) al più complesso (riga 3, in alto)
+const intensityPatterns = {
+  piano:   ['As Played', 'Up · Down', 'Alberti Bass', 'Broken Chord Classic'],
+  bass:    ['Root Sostenuto', 'Root-Fifth Alternato', 'Walking Pop', 'Walking Sincopato'],
+  guitar:  ['Pad Sostenuto', 'Strumming Simulato', 'Up · Down Picking', 'Travis Picking'],
+  strings: ['Sostenuto Legato', 'Legato Mosso', 'Tremolo Leggero', 'Tremolo Pizzicato']
+};
+
+const instrumentNames = { piano:'VST Piano', bass:'VST Basso', guitar:'VST Chitarra', strings:'VST Archi' };
+
+let activeFamily = 'guitar';
+let activeChord = 0;
+// intensità per accordo, per famiglia: default centrale
+let intensityByChord = {};
+families.forEach(f=>{ intensityByChord[f.id] = new Array(8).fill(1); });
+
+const segmented = document.getElementById('segmented');
+const chordRow = document.getElementById('chordRow');
+const autoplayGrid = document.getElementById('autoplayGrid');
+const patternName = document.getElementById('patternName');
+const patternSub = document.getElementById('patternSub');
+const routeLabel = document.getElementById('routeLabel');
+const tempoPill = document.getElementById('tempoPill');
+const root = document.documentElement;
+
+function applyAccent(){
+  const map = {
+    piano:['--piano','--piano-dark'], bass:['--bass','--bass-dark'],
+    guitar:['--guitar','--guitar-dark'], strings:['--strings','--strings-dark']
+  };
+  const [c, cd] = map[activeFamily];
+  root.style.setProperty('--accent', `var(${c})`);
+  root.style.setProperty('--accent-dark', `var(${cd})`);
+}
+
+function renderSegmented(){
+  segmented.innerHTML = '';
+  families.forEach(f=>{
+    const seg = document.createElement('div');
+    seg.className = 'segment' + (f.id===activeFamily ? ' selected':'');
+    seg.textContent = f.label;
+    seg.onclick = ()=>{ activeFamily = f.id; applyAccent(); renderAll(); };
+    segmented.appendChild(seg);
+  });
+}
+
+function renderChordRow(){
+  chordRow.innerHTML = '';
+  chords.forEach((c,i)=>{
+    const btn = document.createElement('div');
+    btn.className = 'chord-btn' + (i===activeChord ? ' selected':'');
+    btn.innerHTML = `<div class="r">${c.root}</div><div class="q">${c.q}</div>`;
+    btn.onclick = ()=>{ activeChord = i; renderAll(); };
+    chordRow.appendChild(btn);
+  });
+}
+
+function renderAutoplayGrid(){
+  autoplayGrid.innerHTML = '';
+  // 4 righe (dall'alto = intensità 3 verso il basso = intensità 0), 8 colonne (accordi)
+  for(let rowVisual=0; rowVisual<4; rowVisual++){
+    const intensity = 3 - rowVisual; // riga in alto = intensità massima
+    for(let col=0; col<8; col++){
+      const cell = document.createElement('div');
+      const isActiveCol = col === activeChord;
+      const isSelected = isActiveCol && intensityByChord[activeFamily][col] === intensity;
+      cell.className = 'cell' + (isActiveCol ? ' active-col':'') + (isSelected ? ' selected':'');
+      cell.onclick = ()=>{
+        activeChord = col;
+        intensityByChord[activeFamily][col] = intensity;
+        renderAll();
+      };
+      autoplayGrid.appendChild(cell);
+    }
+  }
+}
+
+function renderReadout(){
+  const level = intensityByChord[activeFamily][activeChord];
+  const name = intensityPatterns[activeFamily][level];
+  patternName.textContent = name;
+  patternSub.textContent = `${families.find(f=>f.id===activeFamily).label} · Intensità ${level+1}/4 · Accordo ${chords[activeChord].root}`;
+  routeLabel.textContent = `→ ${instrumentNames[activeFamily]}`;
+}
+
+function renderAll(){
+  renderSegmented();
+  renderChordRow();
+  renderAutoplayGrid();
+  renderReadout();
+}
+
+applyAccent();
+renderAll();
+</script>
+
+</body>
+</html>
