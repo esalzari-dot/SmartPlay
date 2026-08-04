@@ -25,5 +25,5 @@ Segui rigorosamente l'ordine indicato nella sezione 10 di `SPEC.md` ("Ordine di 
 
 ## Prima di ogni sessione
 1. Rileggi `SPEC.md` per il modulo su cui stai per lavorare
-2. Se stai lavorando sulla UI, apri i mockup in `/docs` come riferimento visivo (non serve renderizzarli, sono riferimento statico)
+2. Se stai lavorando sulla UI, apri i mockup in `root` come riferimento visivo (non serve renderizzarli, sono riferimento statico)
 3. Verifica che le modifiche non rompano i test esistenti prima di proporre nuovo codice
