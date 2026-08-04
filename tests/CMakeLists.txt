@@ -13,6 +13,7 @@ add_executable(smartchord_tests
     PatternLibraryTests.cpp
     AutoplayGridStateTests.cpp
     ArpeggiatorEngineTests.cpp
+    MidiOutputManagerTests.cpp
 )
 
 target_link_libraries(smartchord_tests PRIVATE smartchord_core Catch2::Catch2WithMain)
