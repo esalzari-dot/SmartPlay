@@ -28,7 +28,7 @@ VoicingProfile getVoicingProfile (InstrumentFamily family)
             return { InstrumentFamily::Piano, 36, 84, 8, 1, 0, false, VoicingStyle::Block };
 
         case InstrumentFamily::Bass:
-            return { InstrumentFamily::Bass, 28, 55, 1, 1, 0, false, VoicingStyle::Monophonic };
+            return { InstrumentFamily::Bass, 28, 55, 4, 1, 0, false, VoicingStyle::Monophonic };
 
         case InstrumentFamily::Guitar:
             return { InstrumentFamily::Guitar, 40, 76, 6, 1, 12, false, VoicingStyle::Block };

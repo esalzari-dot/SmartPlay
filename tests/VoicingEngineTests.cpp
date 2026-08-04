@@ -58,11 +58,11 @@ TEST_CASE("voiceChord generates the expected notes per instrument family for a C
         CHECK(result.topNoteIndex == 2);
     }
 
-    SECTION("Bass reduces to the root, shifted into its low range")
+    SECTION("Bass keeps the full chord (for pattern indexing), shifted into its low range")
     {
         const auto result = voiceChord(cMajor, getVoicingProfile(InstrumentFamily::Bass));
-        CHECK(result.notes == std::vector<int>{48});
-        CHECK(result.topNoteIndex == 0);
+        CHECK(result.notes == std::vector<int>{48, 52, 55});
+        CHECK(result.topNoteIndex == 2);
     }
 
     SECTION("Guitar keeps the block chord within its playable range")
@@ -86,7 +86,10 @@ TEST_CASE("voiceChord keeps notes within the instrument range regardless of octa
 
     const auto result = voiceChord(highBassChord, getVoicingProfile(InstrumentFamily::Bass));
 
-    REQUIRE(result.notes.size() == 1);
-    CHECK(result.notes[0] >= 28);
-    CHECK(result.notes[0] <= 55);
+    REQUIRE(result.notes.size() == 3);
+    for (int note : result.notes)
+    {
+        CHECK(note >= 28);
+        CHECK(note <= 55);
+    }
 }

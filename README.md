@@ -22,7 +22,7 @@ Sviluppo in corso, seguendo l'ordine indicato nella sezione 10 di `SPEC.md`:
 - [x] 2. `VoicingEngine` + `VoicingProfile` per le 4 famiglie
 - [x] 3. `PatternLibrary` (dataset JSON + parser)
 - [x] 4. `AutoplayGridState` + `resolvePattern()`
-- [ ] 5. `ArpeggiatorEngine`
+- [x] 5. `ArpeggiatorEngine`
 - [ ] 6. `MidiOutputManager`
 - [ ] 7. UI
 - [ ] 8. Integrazione VST3/AU

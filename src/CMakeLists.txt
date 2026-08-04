@@ -3,6 +3,7 @@ add_library(smartchord_core STATIC
     smartchord/VoicingEngine.cpp
     smartchord/PatternLibrary.cpp
     smartchord/AutoplayGridState.cpp
+    smartchord/ArpeggiatorEngine.cpp
 )
 
 target_include_directories(smartchord_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
