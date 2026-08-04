@@ -19,7 +19,7 @@ Funzionalità core:
 - I pattern sono organizzati per famiglia strumentale (Piano, Basso, Chitarra, Archi) — non generano suoni diversi, ma voicing e ritmi musicalmente coerenti con lo strumento che l'utente collegherà a valle
 
 ### Riferimento UI/UX
-Vedi `mockup-v2-garageband-style.html` (mockup di riferimento, aperto in un browser) per il comportamento atteso della griglia Autoplay. `mockup-v1-hardware.html` è una variante scartata, tenuta come riferimento storico.
+Vedi `docs/mockup-v2-garageband-style.html` (mockup di riferimento, aperto in un browser) per il comportamento atteso della griglia Autoplay. `docs/mockup-v1-hardware.html` è una variante scartata, tenuta come riferimento storico.
 
 ---
 
@@ -211,7 +211,7 @@ Consiglio: serializzare l'intera `PatternLibrary` come dataset esterno (JSON, o 
 
 ## 9. UI — riferimento GarageBand Autoplay Grid
 
-Layout della UI (vedi `/docs/mockup-v2-garageband-style.html`):
+Layout della UI (vedi `docs/mockup-v2-garageband-style.html`):
 - Switcher segmentato per famiglia strumentale (Piano/Basso/Chitarra/Archi) in alto
 - Riga di 8 pulsanti accordo, selezionabili singolarmente
 - Griglia Autoplay sottostante: 8 colonne (una per accordo) × 4 righe (intensità, dal basso=semplice all'alto=complesso)
@@ -229,5 +229,5 @@ Layout della UI (vedi `/docs/mockup-v2-garageband-style.html`):
 4. `AutoplayGridState` + `resolvePattern()`
 5. `ArpeggiatorEngine` come sequencer step-based agganciato a `SyncClock`
 6. `MidiOutputManager` (panic/note-off al cambio accordo/intensità)
-7. UI: switcher famiglia + 8 pad accordo + griglia Autoplay 8×4 (vedi mockup in `/docs`)
+7. UI: switcher famiglia + 8 pad accordo + griglia Autoplay 8×4 (vedi mockup in `docs/`)
 8. Integrazione VST3/AU wrapper JUCE, test in DAW reale con VST strumento a valle
