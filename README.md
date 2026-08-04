@@ -10,10 +10,30 @@ Permette di selezionare fino a 8 accordi e generare pattern di arpeggio/accompag
 /SPEC.md      → specifica tecnica completa (architettura, moduli, dataset pattern)
 /CLAUDE.md    → istruzioni operative per lo sviluppo assistito da Claude Code
 /docs/        → mockup UI di riferimento (HTML)
+/data/        → dataset pattern in formato JSON (PatternLibrary, SPEC.md sezione 5.3)
+/src/         → moduli C++ (smartchord::ChordDefinition, VoicingEngine, PatternLibrary, ...)
+/tests/       → unit test Catch2
 ```
 
 ## Stato del progetto
-Fase di design completata (vedi `SPEC.md`). Sviluppo del codice non ancora iniziato — seguire l'ordine indicato nella sezione 10 di `SPEC.md`.
+Sviluppo in corso, seguendo l'ordine indicato nella sezione 10 di `SPEC.md`:
+
+- [x] 1. `ChordDefinition` + tabella intervalli
+- [x] 2. `VoicingEngine` + `VoicingProfile` per le 4 famiglie
+- [x] 3. `PatternLibrary` (dataset JSON + parser)
+- [ ] 4. `AutoplayGridState` + `resolvePattern()`
+- [ ] 5. `ArpeggiatorEngine`
+- [ ] 6. `MidiOutputManager`
+- [ ] 7. UI
+- [ ] 8. Integrazione VST3/AU
+
+## Build & test
+
+```
+cmake -S . -B build
+cmake --build build -j
+cd build && ctest --output-on-failure
+```
 
 ## Requisiti
 - JUCE (ultima versione stabile)
