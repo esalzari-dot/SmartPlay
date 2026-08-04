@@ -1,0 +1,20 @@
+# Build
+build/
+cmake-build-*/
+*.o
+*.obj
+
+# JUCE
+JuceLibraryCode/
+*.jucer.bak
+
+# IDE
+.vs/
+.vscode/
+*.xcodeproj/
+*.xcworkspace/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

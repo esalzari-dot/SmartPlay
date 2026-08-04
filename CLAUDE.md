@@ -1,6 +1,6 @@
 # Istruzioni per Claude Code — Smart Chord & Arpeggiator
 
-Questo repository contiene lo sviluppo di un plugin **MIDI FX** VST3/AU in JUCE (C++), ispirato agli Smart Instrument di GarageBand. La specifica completa è in `SPEC.md` — **leggila per intero prima di scrivere qualsiasi codice**. I mockup UI di riferimento sono in `/docs`.
+Questo repository contiene lo sviluppo di un plugin **MIDI FX** VST3/AU in JUCE (C++), ispirato agli Smart Instrument di GarageBand. La specifica completa è in `SPEC.md` — **leggila per intero prima di scrivere qualsiasi codice**. I mockup UI di riferimento sono in `docs/`.
 
 ## Vincoli fondamentali (non violare)
 - Il plugin è **MIDI-only**: nessun motore audio/sintesi. `isMidiEffect() == true`, nessun output audio, solo MIDI out.
@@ -25,5 +25,5 @@ Segui rigorosamente l'ordine indicato nella sezione 10 di `SPEC.md` ("Ordine di 
 
 ## Prima di ogni sessione
 1. Rileggi `SPEC.md` per il modulo su cui stai per lavorare
-2. Se stai lavorando sulla UI, apri i mockup in `root` come riferimento visivo (non serve renderizzarli, sono riferimento statico)
+2. Se stai lavorando sulla UI, apri i mockup in `docs/` come riferimento visivo (non serve renderizzarli, sono riferimento statico)
 3. Verifica che le modifiche non rompano i test esistenti prima di proporre nuovo codice
