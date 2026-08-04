@@ -21,7 +21,7 @@ Sviluppo in corso, seguendo l'ordine indicato nella sezione 10 di `SPEC.md`:
 - [x] 1. `ChordDefinition` + tabella intervalli
 - [x] 2. `VoicingEngine` + `VoicingProfile` per le 4 famiglie
 - [x] 3. `PatternLibrary` (dataset JSON + parser)
-- [ ] 4. `AutoplayGridState` + `resolvePattern()`
+- [x] 4. `AutoplayGridState` + `resolvePattern()`
 - [ ] 5. `ArpeggiatorEngine`
 - [ ] 6. `MidiOutputManager`
 - [ ] 7. UI

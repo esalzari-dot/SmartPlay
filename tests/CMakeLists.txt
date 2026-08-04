@@ -11,6 +11,7 @@ add_executable(smartchord_tests
     ChordDefinitionTests.cpp
     VoicingEngineTests.cpp
     PatternLibraryTests.cpp
+    AutoplayGridStateTests.cpp
 )
 
 target_link_libraries(smartchord_tests PRIVATE smartchord_core Catch2::Catch2WithMain)
