@@ -19,7 +19,7 @@ Funzionalità core:
 - I pattern sono organizzati per famiglia strumentale (Piano, Basso, Chitarra, Archi) — non generano suoni diversi, ma voicing e ritmi musicalmente coerenti con lo strumento che l'utente collegherà a valle
 
 ### Riferimento UI/UX
-Vedi `/docs/mockup-v2-garageband-style.html` (mockup di riferimento, aperto in un browser) per il comportamento atteso della griglia Autoplay. `/docs/mockup-v1-hardware.html` è una variante scartata, tenuta come riferimento storico.
+Vedi `mockup-v2-garageband-style.html` (mockup di riferimento, aperto in un browser) per il comportamento atteso della griglia Autoplay. `mockup-v1-hardware.html` è una variante scartata, tenuta come riferimento storico.
 
 ---
 
