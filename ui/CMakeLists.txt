@@ -5,13 +5,16 @@ juce_add_gui_app(SmartChordArpUI
 
 target_sources(SmartChordArpUI PRIVATE
     Source/Main.cpp
-    Source/MainComponent.cpp
-    Source/FamilySwitcher.cpp
-    Source/ChordPadRow.cpp
-    Source/AutoplayGridComponent.cpp
-    Source/PatternReadout.cpp
-    Source/ChordLabel.cpp
+    Source/StandaloneComponent.cpp
+    Components/AutoplayGridPanel.cpp
+    Components/FamilySwitcher.cpp
+    Components/ChordPadRow.cpp
+    Components/AutoplayGridComponent.cpp
+    Components/PatternReadout.cpp
+    Components/ChordLabel.cpp
 )
+
+target_include_directories(SmartChordArpUI PRIVATE Components)
 
 target_compile_features(SmartChordArpUI PRIVATE cxx_std_17)
 

@@ -50,6 +50,30 @@ std::vector<NoteEvent> generateSequence (const PatternDefinition& pattern,
                                           const VoicingResult& voicing,
                                           const SyncClock& clock = {});
 
+// Somma delle durate di rhythmGrid: lunghezza totale, in beat, di un passaggio del
+// pattern (utile per sapere quando un loop deve ripartire da capo).
+double patternLoopLengthBeats (const PatternDefinition& pattern);
+
+struct ScheduledEvent
+{
+    NoteEvent event;
+    int sampleOffset = 0; // offset in campioni rispetto all'inizio del blocco audio
+};
+
+// Determina quali eventi del loop cadono nella finestra [windowStartBeat, windowStartBeat +
+// windowLengthBeats), gestendo il wrap-around quando la finestra supera loopLengthBeats
+// (anche piu' volte, se il loop e' piu' corto della finestra). windowStartBeat e' una
+// posizione assoluta (es. la PPQ dell'host): viene ridotta modulo loopLengthBeats
+// internamente, quindi puo' essere arbitrariamente grande. Pensata per essere chiamata una
+// volta per blocco audio dal wrapper del plugin (SPEC.md sezione 6, aggancio a SyncClock/
+// AudioPlayHead), qui come funzione pura e testabile senza dipendenze da JUCE.
+std::vector<ScheduledEvent> scheduleEventsInWindow (const std::vector<NoteEvent>& loopEvents,
+                                                     double loopLengthBeats,
+                                                     double windowStartBeat,
+                                                     double windowLengthBeats,
+                                                     double samplesPerBeat,
+                                                     int blockNumSamples);
+
 // Motore step-based: lega insieme AutoplayGridState, PatternLibrary e VoicingEngine per
 // risolvere ed eseguire il pattern attivo per un dato accordo (SPEC.md sezione 5.4).
 class ArpeggiatorEngine

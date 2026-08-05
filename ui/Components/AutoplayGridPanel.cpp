@@ -1,32 +1,16 @@
-#include "MainComponent.h"
+#include "AutoplayGridPanel.h"
 #include "ChordLabel.h"
 
 namespace smartchord::ui
 {
 
-namespace
+AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
+                                       AutoplayGridState& gridStateIn,
+                                       const PatternLibrary& patternLibraryIn,
+                                       InstrumentFamily initialFamily)
+    : chordBank (chordBankIn), gridState (gridStateIn), patternLibrary (patternLibraryIn),
+      activeFamily (initialFamily)
 {
-    // Accordi dimostrativi per gli 8 slot, cosi' l'harness UI mostra pad distinguibili
-    // (SPEC.md non prescrive un banco di default: la scelta e' lasciata all'utente).
-    const ChordDefinition demoChords[numChordBankSlots] = {
-        { 0, ChordQuality::Maj,  0, 0 },  // C
-        { 7, ChordQuality::Maj,  0, 0 },  // G
-        { 9, ChordQuality::Min,  0, 0 },  // A min
-        { 5, ChordQuality::Maj,  0, 0 },  // F
-        { 2, ChordQuality::Min7, 0, 0 },  // D min7
-        { 4, ChordQuality::Min,  0, 0 },  // E min
-        { 11, ChordQuality::Dim, 0, 0 },  // B dim
-        { 0, ChordQuality::Dom7, 0, 0 },  // C7
-    };
-}
-
-MainComponent::MainComponent()
-{
-    patternLibrary = PatternLibrary::fromJsonFile (std::string (SMARTCHORD_DATA_DIR) + "/patterns.json");
-
-    for (int slot = 0; slot < numChordBankSlots; ++slot)
-        chordBank.setChord (slot, demoChords[static_cast<size_t> (slot)]);
-
     titleLabel.setText ("Smart Chord & Arpeggiator", juce::dontSendNotification);
     titleLabel.setFont (juce::FontOptions (15.0f, juce::Font::bold));
     titleLabel.setColour (juce::Label::textColourId, Palette::text);
@@ -61,7 +45,7 @@ MainComponent::MainComponent()
     refresh();
 }
 
-void MainComponent::refresh()
+void AutoplayGridPanel::refresh()
 {
     const auto accent = accentColourFor (activeFamily);
     const auto accentDark = accentDarkColourFor (activeFamily);
@@ -77,14 +61,17 @@ void MainComponent::refresh()
     const auto chordLabel = noteNameFor (activeChord.rootSemitone) + " " + qualityAbbreviationFor (activeChord.quality);
 
     patternReadout.setContent (pattern, activeFamily, intensityLevel, chordLabel, accent);
+
+    if (onStateChanged != nullptr)
+        onStateChanged();
 }
 
-void MainComponent::paint (juce::Graphics& g)
+void AutoplayGridPanel::paint (juce::Graphics& g)
 {
     g.fillAll (Palette::background);
 }
 
-void MainComponent::resized()
+void AutoplayGridPanel::resized()
 {
     auto bounds = getLocalBounds();
 

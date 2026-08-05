@@ -1,6 +1,7 @@
 #include "smartchord/ArpeggiatorEngine.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace smartchord
 {
@@ -83,6 +84,60 @@ std::vector<NoteEvent> generateSequence (const PatternDefinition& pattern,
     }
 
     return events;
+}
+
+double patternLoopLengthBeats (const PatternDefinition& pattern)
+{
+    double total = 0.0;
+    for (float duration : pattern.rhythmGrid)
+        total += duration;
+    return total;
+}
+
+std::vector<ScheduledEvent> scheduleEventsInWindow (const std::vector<NoteEvent>& loopEvents,
+                                                     double loopLengthBeats,
+                                                     double windowStartBeat,
+                                                     double windowLengthBeats,
+                                                     double samplesPerBeat,
+                                                     int blockNumSamples)
+{
+    std::vector<ScheduledEvent> result;
+
+    if (loopEvents.empty() || loopLengthBeats <= 0.0 || windowLengthBeats <= 0.0)
+        return result;
+
+    double localStart = std::fmod (windowStartBeat, loopLengthBeats);
+    if (localStart < 0.0)
+        localStart += loopLengthBeats;
+
+    double remaining = windowLengthBeats;
+    double sampleBase = 0.0;
+
+    while (remaining > 0.0)
+    {
+        const double localEnd = std::min (localStart + remaining, loopLengthBeats);
+        const double consumedThisPass = localEnd - localStart;
+
+        for (const auto& event : loopEvents)
+        {
+            if (event.beatPosition >= localStart && event.beatPosition < localEnd)
+            {
+                const double beatOffset = event.beatPosition - localStart;
+                int sampleOffset = static_cast<int> (std::round (sampleBase + beatOffset * samplesPerBeat));
+                sampleOffset = std::clamp (sampleOffset, 0, std::max (0, blockNumSamples - 1));
+                result.push_back ({ event, sampleOffset });
+            }
+        }
+
+        sampleBase += consumedThisPass * samplesPerBeat;
+        remaining -= consumedThisPass;
+        localStart = 0.0; // dopo il primo giro riparte dall'inizio del loop (wrap-around)
+    }
+
+    std::sort (result.begin(), result.end(),
+               [] (const ScheduledEvent& a, const ScheduledEvent& b) { return a.sampleOffset < b.sampleOffset; });
+
+    return result;
 }
 
 ArpeggiatorEngine::ArpeggiatorEngine (const PatternLibrary& patternLibraryIn, const AutoplayGridState& gridStateIn)
