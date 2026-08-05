@@ -11,8 +11,9 @@ Permette di selezionare fino a 8 accordi e generare pattern di arpeggio/accompag
 /CLAUDE.md    → istruzioni operative per lo sviluppo assistito da Claude Code
 /docs/        → mockup UI di riferimento (HTML)
 /data/        → dataset pattern in formato JSON (PatternLibrary, SPEC.md sezione 5.3)
-/src/         → moduli C++ (smartchord::ChordDefinition, VoicingEngine, PatternLibrary, ...)
+/src/         → moduli core C++ (smartchord::ChordDefinition, VoicingEngine, PatternLibrary, ...)
 /tests/       → unit test Catch2
+/ui/          → harness JUCE standalone per la UI (switcher famiglia, pad accordo, griglia Autoplay)
 ```
 
 ## Stato del progetto
@@ -24,7 +25,7 @@ Sviluppo in corso, seguendo l'ordine indicato nella sezione 10 di `SPEC.md`:
 - [x] 4. `AutoplayGridState` + `resolvePattern()`
 - [x] 5. `ArpeggiatorEngine`
 - [x] 6. `MidiOutputManager`
-- [ ] 7. UI
+- [x] 7. UI (harness JUCE standalone, vedi `/ui`)
 - [ ] 8. Integrazione VST3/AU
 
 ## Build & test
@@ -34,6 +35,24 @@ cmake -S . -B build
 cmake --build build -j
 cd build && ctest --output-on-failure
 ```
+
+La prima configurazione scarica JUCE (via `FetchContent`): richiede rete e qualche minuto in più
+rispetto alle build precedenti, solo core + test.
+
+## UI (harness di sviluppo)
+
+`/ui` contiene un'app JUCE standalone (non ancora il plugin VST3/AU, quello è lo step 8) che
+mostra lo switcher famiglia, la riga di 8 pad accordo e la griglia Autoplay 8×4, seguendo il
+mockup in `docs/mockup-v2-garageband-style.html` e collegata ai moduli core reali
+(`ChordBankModule`, `AutoplayGridState`, `PatternLibrary`).
+
+```
+cmake --build build --target SmartChordArpUI -j
+./build/ui/SmartChordArpUI_artefacts/Debug/Smart\ Chord\ \&\ Arpeggiator
+```
+
+Per disabilitare la build della UI (es. in ambienti senza le librerie di sistema di JUCE:
+X11/ALSA/FreeType/Fontconfig/OpenGL), passa `-DSMARTCHORD_BUILD_UI=OFF` a `cmake`.
 
 ## Requisiti
 - JUCE (ultima versione stabile)
