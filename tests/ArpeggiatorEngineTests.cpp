@@ -216,3 +216,106 @@ TEST_CASE("ArpeggiatorEngine::renderChordLoop returns no events when no pattern 
 
     CHECK(engine.renderChordLoop(cMajor, InstrumentFamily::Piano, 0).empty());
 }
+
+TEST_CASE("patternLoopLengthBeats sums the rhythmGrid durations", "[ArpeggiatorEngine]")
+{
+    PatternDefinition walkingPop;
+    walkingPop.rhythmGrid = {0.5f, 0.25f, 0.25f, 0.5f};
+    CHECK(patternLoopLengthBeats(walkingPop) == Catch::Approx(1.5));
+
+    CHECK(patternLoopLengthBeats(PatternDefinition{}) == Catch::Approx(0.0));
+}
+
+TEST_CASE("scheduleEventsInWindow schedules events that fall within a non-wrapping window", "[ArpeggiatorEngine]")
+{
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.0},
+        {NoteEvent::Kind::NoteOn, 61, defaultVelocity, 1.0},
+        {NoteEvent::Kind::NoteOn, 62, defaultVelocity, 2.0},
+        {NoteEvent::Kind::NoteOn, 63, defaultVelocity, 3.0},
+    };
+
+    const auto scheduled = scheduleEventsInWindow(loopEvents, 4.0, 0.0, 2.0, 100.0, 200);
+
+    REQUIRE(scheduled.size() == 2);
+    CHECK(scheduled[0].event.midiNote == 60);
+    CHECK(scheduled[0].sampleOffset == 0);
+    CHECK(scheduled[1].event.midiNote == 61);
+    CHECK(scheduled[1].sampleOffset == 100);
+}
+
+TEST_CASE("scheduleEventsInWindow wraps around the end of the loop", "[ArpeggiatorEngine]")
+{
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.0},
+        {NoteEvent::Kind::NoteOn, 61, defaultVelocity, 1.0},
+        {NoteEvent::Kind::NoteOn, 62, defaultVelocity, 2.0},
+        {NoteEvent::Kind::NoteOn, 63, defaultVelocity, 3.0},
+    };
+
+    // Finestra [3, 5) su un loop di 4 beat: copre beat 3 (fine giro) e beat 0 (giro successivo).
+    const auto scheduled = scheduleEventsInWindow(loopEvents, 4.0, 3.0, 2.0, 100.0, 200);
+
+    REQUIRE(scheduled.size() == 2);
+    CHECK(scheduled[0].event.midiNote == 63);
+    CHECK(scheduled[0].sampleOffset == 0);
+    CHECK(scheduled[1].event.midiNote == 60);
+    CHECK(scheduled[1].sampleOffset == 100);
+}
+
+TEST_CASE("scheduleEventsInWindow reduces a windowStartBeat far beyond the loop length modulo loopLengthBeats", "[ArpeggiatorEngine]")
+{
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.0},
+        {NoteEvent::Kind::NoteOn, 61, defaultVelocity, 1.0},
+    };
+
+    const auto atZero = scheduleEventsInWindow(loopEvents, 4.0, 0.0, 2.0, 100.0, 200);
+    const auto farBeyond = scheduleEventsInWindow(loopEvents, 4.0, 8.0, 2.0, 100.0, 200); // 8 mod 4 == 0
+
+    REQUIRE(atZero.size() == farBeyond.size());
+    for (size_t i = 0; i < atZero.size(); ++i)
+    {
+        CHECK(atZero[i].event.midiNote == farBeyond[i].event.midiNote);
+        CHECK(atZero[i].sampleOffset == farBeyond[i].sampleOffset);
+    }
+}
+
+TEST_CASE("scheduleEventsInWindow handles a window spanning multiple loop repetitions", "[ArpeggiatorEngine]")
+{
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.0},
+    };
+
+    // Loop di 0.5 beat, finestra di 2 beat: il loop si ripete 4 volte nello stesso blocco.
+    const auto scheduled = scheduleEventsInWindow(loopEvents, 0.5, 0.0, 2.0, 10.0, 20);
+
+    REQUIRE(scheduled.size() == 4);
+    CHECK(scheduled[0].sampleOffset == 0);
+    CHECK(scheduled[1].sampleOffset == 5);
+    CHECK(scheduled[2].sampleOffset == 10);
+    CHECK(scheduled[3].sampleOffset == 15);
+}
+
+TEST_CASE("scheduleEventsInWindow clamps a sample offset that rounds past the end of the block", "[ArpeggiatorEngine]")
+{
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.999},
+    };
+
+    const auto scheduled = scheduleEventsInWindow(loopEvents, 1.0, 0.0, 1.0, 100.0, 100);
+
+    REQUIRE(scheduled.size() == 1);
+    CHECK(scheduled[0].sampleOffset == 99); // blockNumSamples - 1
+}
+
+TEST_CASE("scheduleEventsInWindow returns no events for invalid or empty inputs", "[ArpeggiatorEngine]")
+{
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.0},
+    };
+
+    CHECK(scheduleEventsInWindow({}, 4.0, 0.0, 2.0, 100.0, 200).empty());
+    CHECK(scheduleEventsInWindow(loopEvents, 0.0, 0.0, 2.0, 100.0, 200).empty());
+    CHECK(scheduleEventsInWindow(loopEvents, 4.0, 0.0, 0.0, 100.0, 200).empty());
+}

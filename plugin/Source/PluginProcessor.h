@@ -1,0 +1,98 @@
+#pragma once
+
+#include "smartchord/ArpeggiatorEngine.h"
+#include "smartchord/AutoplayGridState.h"
+#include "smartchord/ChordBankModule.h"
+#include "smartchord/MidiOutputManager.h"
+#include "smartchord/PatternLibrary.h"
+#include "smartchord/VoicingEngine.h"
+
+#include <juce_audio_processors/juce_audio_processors.h>
+
+namespace smartchord
+{
+
+// AudioProcessor MIDI-only (SPEC.md sezione 1): isMidiEffect() == true, nessun bus
+// audio, genera solo MIDI out. Aggancia ArpeggiatorEngine/MidiOutputManager
+// all'AudioPlayHead dell'host per BPM e posizione PPQ (SPEC.md sezione 6) e li esegue
+// in tempo reale in processBlock() (SPEC.md sezione 10, step 8).
+//
+// Lo stato condiviso con la UI (ChordBankModule, AutoplayGridState, famiglia attiva) e'
+// protetto da un lock breve: la UI lo modifica raramente (interazione utente), il thread
+// audio ne fa una copia di lavoro a inizio blocco, cosi' il lock non resta mai preso per
+// la durata di processBlock().
+class SmartChordAudioProcessor : public juce::AudioProcessor
+{
+public:
+    SmartChordAudioProcessor();
+    ~SmartChordAudioProcessor() override = default;
+
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
+    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override { return true; }
+
+    const juce::String getName() const override { return JucePlugin_Name; }
+
+    bool acceptsMidi() const override { return true; }
+    bool producesMidi() const override { return true; }
+    bool isMidiEffect() const override { return true; }
+    double getTailLengthSeconds() const override { return 0.0; }
+
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+
+    void getStateInformation (juce::MemoryBlock& destData) override;
+    void setStateInformation (const void* data, int sizeInBytes) override;
+
+    // --- API thread-safe per la UI (message thread) --------------------------------
+    void setActiveSlot (int slot);
+    void setChordAt (int slot, const ChordDefinition& chord);
+    void setIntensityAt (InstrumentFamily family, int chordSlot, int intensityLevel);
+    void setActiveFamily (InstrumentFamily family);
+
+    ChordBankModule getChordBankSnapshot() const;
+    AutoplayGridState getGridStateSnapshot() const;
+    InstrumentFamily getActiveFamilySnapshot() const;
+    const PatternLibrary& getPatternLibrary() const noexcept { return patternLibrary; }
+
+private:
+    void regenerateAudioThreadLoop (double bpm);
+
+    // Caricata una sola volta nel costruttore, mai modificata dopo: sicura senza lock.
+    PatternLibrary patternLibrary;
+
+    // Stato autorevole, condiviso con la UI: protetto da stateLock.
+    mutable juce::CriticalSection stateLock;
+    ChordBankModule chordBank;
+    AutoplayGridState gridState;
+    InstrumentFamily activeFamily = InstrumentFamily::Guitar;
+
+    // Copie di lavoro usate esclusivamente dal thread audio in processBlock().
+    ChordBankModule audioChordBank;
+    AutoplayGridState audioGridState;
+    InstrumentFamily audioFamily = InstrumentFamily::Guitar;
+
+    MidiOutputManager midiOutputManager;
+
+    std::vector<NoteEvent> currentLoopEvents;
+    double currentLoopLengthBeats = 0.0;
+    double loopPhaseOffsetBeats = 0.0;
+    double internalBeatPosition = 0.0; // usata solo se l'host non fornisce la posizione PPQ
+
+    int previousActiveSlot = -1;
+    InstrumentFamily previousFamily = InstrumentFamily::Piano;
+    int previousIntensity = -1;
+    bool havePreviousSelection = false;
+
+    double currentSampleRate = 44100.0;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SmartChordAudioProcessor)
+};
+
+} // namespace smartchord

@@ -1,4 +1,4 @@
-#include "MainComponent.h"
+#include "StandaloneComponent.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -26,7 +26,7 @@ private:
             : juce::DocumentWindow (name, Palette::background, juce::DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar (true);
-            setContentOwned (new MainComponent(), true);
+            setContentOwned (new StandaloneComponent(), true);
             centreWithSize (getWidth(), getHeight());
             setVisible (true);
         }
