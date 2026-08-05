@@ -1,10 +1,17 @@
+# AU e' un formato Apple: buildabile solo su macOS (richiede il SDK Audio Unit di sistema).
+if(APPLE)
+    set(SMARTCHORD_PLUGIN_FORMATS VST3 AU Standalone)
+else()
+    set(SMARTCHORD_PLUGIN_FORMATS VST3 Standalone)
+endif()
+
 juce_add_plugin(SmartChordArp
     PRODUCT_NAME "Smart Chord Arpeggiator"
     COMPANY_NAME "SmartPlay"
     BUNDLE_ID "com.smartplay.smartchordarp"
     PLUGIN_MANUFACTURER_CODE Splr
     PLUGIN_CODE Scap
-    FORMATS VST3 Standalone
+    FORMATS ${SMARTCHORD_PLUGIN_FORMATS}
     IS_SYNTH FALSE
     IS_MIDI_EFFECT TRUE
     NEEDS_MIDI_INPUT TRUE
