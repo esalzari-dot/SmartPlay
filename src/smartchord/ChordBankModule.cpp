@@ -1,6 +1,7 @@
 #include "smartchord/ChordBankModule.h"
 
 #include <stdexcept>
+#include <string>
 
 namespace smartchord
 {
