@@ -1,0 +1,91 @@
+name: Release Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: macos
+          - os: ubuntu-latest
+            platform: linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install JUCE Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libasound2-dev libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libfreetype-dev libfontconfig1-dev libgl1-mesa-dev libcurl4-openssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSMARTCHORD_BUILD_TESTS=OFF -DSMARTCHORD_BUILD_UI=OFF
+
+      - name: Build VST3
+        run: cmake --build build --target SmartChordArp_VST3 --config Release -j 4
+
+      - name: Build AU (macOS only)
+        if: matrix.platform == 'macos'
+        run: cmake --build build --target SmartChordArp_AU --config Release -j 4
+
+      - name: Build Standalone
+        run: cmake --build build --target SmartChordArp_Standalone --config Release -j 4
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartChordArp-VST3-${{ matrix.platform }}
+          path: build/plugin/SmartChordArp_artefacts/Release/VST3
+
+      - name: Upload AU (macOS only)
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartChordArp-AU-macos
+          path: build/plugin/SmartChordArp_artefacts/Release/AU
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartChordArp-Standalone-${{ matrix.platform }}
+          path: build/plugin/SmartChordArp_artefacts/Release/Standalone
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Zip each artifact
+        run: |
+          cd artifacts
+          for dir in */; do
+            name="${dir%/}"
+            (cd "$name" && zip -r "../${name}.zip" .)
+          done
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip
+          generate_release_notes: true
