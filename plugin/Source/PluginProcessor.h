@@ -12,10 +12,17 @@
 namespace smartchord
 {
 
-// AudioProcessor MIDI-only (SPEC.md sezione 1): isMidiEffect() == true, nessun bus
-// audio, genera solo MIDI out. Aggancia ArpeggiatorEngine/MidiOutputManager
-// all'AudioPlayHead dell'host per BPM e posizione PPQ (SPEC.md sezione 6) e li esegue
-// in tempo reale in processBlock() (SPEC.md sezione 10, step 8).
+// AudioProcessor MIDI-only (SPEC.md sezione 1): genera solo MIDI out, mai audio.
+// Aggancia ArpeggiatorEngine/MidiOutputManager all'AudioPlayHead dell'host per BPM e
+// posizione PPQ (SPEC.md sezione 6) e li esegue in tempo reale in processBlock()
+// (SPEC.md sezione 10, step 8).
+//
+// Lo stesso processor serve due varianti dello stesso plugin, distinte dal target che lo
+// compila (vedi plugin/CMakeLists.txt):
+//  - MIDI FX (JucePlugin_IsMidiEffect): isMidiEffect() == true, nessun bus audio, come
+//    da SPEC.md. E' la forma corretta, supportata da Cubase/Reaper/Studio One/FL/Logic.
+//  - strumento (VSTi): espone un'uscita audio che resta silenziosa, per gli host che non
+//    ospitano i MIDI FX VST3 (Ableton Live).
 //
 // Lo stato condiviso con la UI (ChordBankModule, AutoplayGridState, famiglia attiva) e'
 // protetto da un lock breve: la UI lo modifica raramente (interazione utente), il thread
@@ -31,6 +38,10 @@ public:
     void releaseResources() override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
+   #if ! JucePlugin_IsMidiEffect
+    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+   #endif
+
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
@@ -38,7 +49,7 @@ public:
 
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
-    bool isMidiEffect() const override { return true; }
+    bool isMidiEffect() const override { return JucePlugin_IsMidiEffect != 0; }
     double getTailLengthSeconds() const override { return 0.0; }
 
     int getNumPrograms() override { return 1; }

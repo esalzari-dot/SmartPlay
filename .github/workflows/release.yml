@@ -41,21 +41,32 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSMARTCHORD_BUILD_TESTS=OFF -DSMARTCHORD_BUILD_UI=OFF
 
-      - name: Build VST3
+      - name: Build VST3 (MIDI FX)
         run: cmake --build build --target SmartChordArp_VST3 --config Release -j 4
+
+      - name: Build VST3 (instrument)
+        run: cmake --build build --target SmartChordArpInst_VST3 --config Release -j 4
 
       - name: Build AU (macOS only)
         if: matrix.platform == 'macos'
-        run: cmake --build build --target SmartChordArp_AU --config Release -j 4
+        run: |
+          cmake --build build --target SmartChordArp_AU --config Release -j 4
+          cmake --build build --target SmartChordArpInst_AU --config Release -j 4
 
       - name: Build Standalone
         run: cmake --build build --target SmartChordArp_Standalone --config Release -j 4
 
-      - name: Upload VST3
+      - name: Upload VST3 (MIDI FX)
         uses: actions/upload-artifact@v4
         with:
           name: SmartChordArp-VST3-${{ matrix.platform }}
           path: build/plugin/SmartChordArp_artefacts/Release/VST3
+
+      - name: Upload VST3 (instrument)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartChordArp-VST3-Instrument-${{ matrix.platform }}
+          path: build/plugin/SmartChordArpInst_artefacts/Release/VST3
 
       - name: Upload AU (macOS only)
         if: matrix.platform == 'macos'
@@ -63,6 +74,13 @@ jobs:
         with:
           name: SmartChordArp-AU-macos
           path: build/plugin/SmartChordArp_artefacts/Release/AU
+
+      - name: Upload AU instrument (macOS only)
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartChordArp-AU-Instrument-macos
+          path: build/plugin/SmartChordArpInst_artefacts/Release/AU
 
       - name: Upload Standalone
         uses: actions/upload-artifact@v4
