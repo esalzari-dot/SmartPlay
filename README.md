@@ -69,9 +69,24 @@ famiglia attiva) e' protetto da un lock breve preso solo per copiarlo a inizio b
 thread audio non lo tiene mai per la durata di `processBlock()`. Lo stato e' persistito tramite
 `getStateInformation`/`setStateInformation` (salvataggio di sessione/preset nella DAW).
 
+Il dataset dei pattern e' **embeddato nel binario** (`juce_add_binary_data`, come previsto
+da `SPEC.md` sezione 5.4): un plugin distribuito non puo' dipendere da un percorso
+dell'albero sorgente della macchina che lo ha compilato.
+
+### Due varianti
+
+| Target | Formato | Quando serve |
+|---|---|---|
+| `SmartChordArp` | MIDI FX (`isMidiEffect() == true`, nessun bus audio) | La forma corretta da `SPEC.md`: Cubase, Reaper, Studio One, FL Studio, Logic (AU) |
+| `SmartChordArpInst` | Strumento (VSTi, uscita audio silenziosa) | Host che non ospitano i MIDI FX VST3 — **Ableton Live** |
+
+In Ableton usa la variante *Inst*: caricala su una traccia MIDI, poi sulla traccia dello
+strumento vero imposta **MIDI From → \<traccia\> → Smart Chord Arpeggiator Inst**.
+
 ```
-cmake --build build --target SmartChordArp_VST3 -j        # bundle .vst3
-cmake --build build --target SmartChordArp_Standalone -j  # eseguibile standalone
+cmake --build build --target SmartChordArp_VST3 -j         # bundle .vst3 (MIDI FX)
+cmake --build build --target SmartChordArpInst_VST3 -j     # bundle .vst3 (strumento)
+cmake --build build --target SmartChordArp_Standalone -j   # eseguibile standalone
 ```
 
 I binari finiscono in `build/plugin/SmartChordArp_artefacts/<Debug|Release>/`. Per usare il VST3

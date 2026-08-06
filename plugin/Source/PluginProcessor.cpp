@@ -1,12 +1,32 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#include <BinaryData.h>
+
 namespace smartchord
 {
 
 namespace
 {
     constexpr int32_t stateFormatVersion = 1;
+
+    // Il dataset e' embeddato nel binario: un plugin distribuito non puo' leggere un
+    // percorso dell'albero sorgente della macchina che lo ha compilato. Un dataset
+    // illeggibile non deve comunque impedire il caricamento del plugin nell'host, quindi
+    // in caso di errore si degrada a una libreria vuota (la griglia non risolvera'
+    // pattern, ma l'editor si apre e l'host resta stabile).
+    PatternLibrary loadEmbeddedPatternLibrary()
+    {
+        try
+        {
+            return PatternLibrary::fromJson (std::string (BinaryData::patterns_json,
+                                                           static_cast<size_t> (BinaryData::patterns_jsonSize)));
+        }
+        catch (const std::exception&)
+        {
+            return {};
+        }
+    }
 
     // Accordi dimostrativi di default (come l'harness standalone), sovrascrivibili
     // dall'utente e comunque persistiti da getStateInformation/setStateInformation.
@@ -31,11 +51,27 @@ namespace
 }
 
 SmartChordAudioProcessor::SmartChordAudioProcessor()
-    : AudioProcessor (BusesProperties()), // MIDI effect puro: nessun bus audio
-      patternLibrary (PatternLibrary::fromJsonFile (std::string (SMARTCHORD_DATA_DIR) + "/patterns.json")),
+    : AudioProcessor (
+       #if JucePlugin_IsMidiEffect
+        BusesProperties() // MIDI effect puro: nessun bus audio
+       #else
+        // Variante strumento: un'uscita audio (sempre silenziosa) e' necessaria perche'
+        // gli host che non ospitano i MIDI FX VST3 accettino il plugin.
+        BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)
+       #endif
+      ),
+      patternLibrary (loadEmbeddedPatternLibrary()),
       chordBank (makeDemoChordBank())
 {
 }
+
+#if ! JucePlugin_IsMidiEffect
+bool SmartChordAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+{
+    const auto& mainOutput = layouts.getMainOutputChannelSet();
+    return mainOutput == juce::AudioChannelSet::mono() || mainOutput == juce::AudioChannelSet::stereo();
+}
+#endif
 
 void SmartChordAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
 {
