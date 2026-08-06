@@ -31,6 +31,12 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
         refresh();
     };
 
+    chordPadRow.onChordEdited = [this] (int slot, const ChordDefinition& chord)
+    {
+        chordBank.setChord (slot, chord);
+        refresh();
+    };
+
     addAndMakeVisible (autoplayGrid);
     autoplayGrid.onCellSelected = [this] (int chordSlot, int intensityLevel)
     {

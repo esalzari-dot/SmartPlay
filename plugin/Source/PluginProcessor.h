@@ -9,6 +9,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <atomic>
+
 namespace smartchord
 {
 
@@ -67,6 +69,10 @@ public:
     void setIntensityAt (InstrumentFamily family, int chordSlot, int intensityLevel);
     void setActiveFamily (InstrumentFamily family);
 
+    // true (una sola volta) se un keyswitch MIDI ha cambiato lo slot attivo da quando e'
+    // stato interrogato l'ultima volta: l'editor lo usa per riallinearsi.
+    bool consumeSlotChangedByMidi() { return slotChangedByMidi.exchange (false, std::memory_order_acq_rel); }
+
     ChordBankModule getChordBankSnapshot() const;
     AutoplayGridState getGridStateSnapshot() const;
     InstrumentFamily getActiveFamilySnapshot() const;
@@ -88,6 +94,9 @@ private:
     ChordBankModule audioChordBank;
     AutoplayGridState audioGridState;
     InstrumentFamily audioFamily = InstrumentFamily::Guitar;
+
+    // Scritto dal thread audio quando un keyswitch cambia lo slot, letto dall'editor.
+    std::atomic<bool> slotChangedByMidi { false };
 
     MidiOutputManager midiOutputManager;
 

@@ -15,10 +15,29 @@ SmartChordAudioProcessorEditor::SmartChordAudioProcessorEditor (SmartChordAudioP
     addAndMakeVisible (panel);
     setResizable (false, false);
     setSize (panel.getWidth(), panel.getHeight());
+
+    startTimerHz (20);
+}
+
+void SmartChordAudioProcessorEditor::timerCallback()
+{
+    if (! processorRef.consumeSlotChangedByMidi())
+        return;
+
+    const int activeSlot = processorRef.getChordBankSnapshot().getActiveSlot();
+    if (activeSlot == chordBank.getActiveSlot())
+        return;
+
+    const juce::ScopedValueSetter<bool> guard (applyingExternalChange, true);
+    chordBank.setActiveSlot (activeSlot);
+    panel.refresh();
 }
 
 void SmartChordAudioProcessorEditor::pushStateToProcessor()
 {
+    if (applyingExternalChange)
+        return;
+
     processorRef.setActiveFamily (panel.getActiveFamily());
     processorRef.setActiveSlot (chordBank.getActiveSlot());
 

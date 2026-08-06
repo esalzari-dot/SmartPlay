@@ -113,6 +113,22 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     buffer.clear(); // MIDI effect: nessun segnale audio in uscita
 
     const int numSamples = buffer.getNumSamples();
+
+    // Keyswitch: una nota nella fascia dedicata seleziona lo slot accordo (SPEC.md
+    // sezione 3). Va letto prima di svuotare il buffer, che poi viene riempito solo con
+    // gli eventi generati - il MIDI in ingresso non passa oltre.
+    int keyswitchSlot = -1;
+    for (const auto metadata : midiMessages)
+    {
+        const auto message = metadata.getMessage();
+        if (! message.isNoteOn())
+            continue;
+
+        const int slot = keyswitchSlotForNote (message.getNoteNumber());
+        if (slot >= 0)
+            keyswitchSlot = slot;
+    }
+
     midiMessages.clear();
 
     if (numSamples <= 0)
@@ -144,10 +160,19 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     // lavoro del thread audio (SPEC.md sezione 8).
     {
         const juce::ScopedLock lock (stateLock);
+
+        // Il keyswitch aggiorna lo stato autorevole, cosi' la scelta sopravvive alla
+        // chiusura dell'editor e finisce nello stato salvato dall'host.
+        if (keyswitchSlot >= 0)
+            chordBank.setActiveSlot (keyswitchSlot);
+
         audioChordBank = chordBank;
         audioGridState = gridState;
         audioFamily = activeFamily;
     }
+
+    if (keyswitchSlot >= 0)
+        slotChangedByMidi.store (true, std::memory_order_release);
 
     const int activeSlot = audioChordBank.getActiveSlot();
     const int currentIntensity = audioGridState.getIntensity (audioFamily, activeSlot);

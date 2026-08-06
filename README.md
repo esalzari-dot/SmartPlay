@@ -72,6 +72,21 @@ cd build && ctest --output-on-failure
 La prima configurazione scarica JUCE (via `FetchContent`): richiede rete e qualche minuto in più
 rispetto alle build precedenti, solo core + test.
 
+## Come si usa
+
+- **Famiglia strumentale**: switcher in alto (Piano / Bass / Guitar / Strings). Cambia i
+  voicing e il set di pattern disponibili.
+- **Scegliere un accordo da suonare**: click sinistro su uno degli 8 pad.
+- **Cambiare l'accordo contenuto in un pad**: **click destro** sul pad → menu con
+  fondamentale, qualità (14 tipi), rivolto e ottava. La modifica è immediata e viene
+  salvata nella sessione della DAW.
+- **Cambiare accordo mentre suoni**: manda al plugin una nota MIDI nella fascia dei
+  keyswitch, **C1–G1** (note MIDI 24-31, con C3 = 60): ognuna seleziona uno degli 8 slot.
+  Queste note non vengono passate a valle e stanno sotto la tessitura dei profili
+  strumentali, quindi non si sovrappongono a quello che suoni.
+- **Intensità del pattern**: griglia Autoplay 8×4 — colonna = accordo, riga = intensità
+  (dal basso, semplice, verso l'alto, complesso). Un click seleziona entrambe insieme.
+
 ## UI
 
 `/ui/Components` contiene i componenti JUCE riusabili (switcher famiglia, riga di 8 pad accordo,
