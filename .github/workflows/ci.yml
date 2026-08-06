@@ -24,7 +24,10 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release -j
+        # Parallelismo limitato esplicitamente: con "-j" senza numero make satura la RAM
+        # del runner compilando in parallelo i moduli JUCE di tutti i target, e il runner
+        # viene terminato ("The runner has received a shutdown signal").
+        run: cmake --build build --config Release -j 4
 
       - name: Test
         working-directory: build
