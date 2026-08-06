@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Permette di rilanciare la CI a mano quando un run resta bloccato in coda lato GitHub.
+  workflow_dispatch:
 
 jobs:
   build-and-test:
