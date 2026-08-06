@@ -91,6 +91,52 @@ rispetto alle build precedenti, solo core + test.
 - **Intensità del pattern**: griglia Autoplay 8×4 — colonna = accordo, riga = intensità
   (dal basso, semplice, verso l'alto, complesso). Un click seleziona entrambe insieme.
 
+## Personalizzare i pattern
+
+I pattern non sono cablati nel codice: il plugin li legge da un file JSON che puoi
+modificare, senza ricompilare nulla (`SPEC.md` §5.4). Al primo avvio viene creato con i 16
+pattern di default, e da quel momento ha la precedenza sui pattern embeddati nel binario:
+
+- **Windows**: `Documenti\SmartChordArp\patterns.json`
+- **macOS**: `~/Documents/SmartChordArp/patterns.json`
+- **Linux**: `~/Documents/SmartChordArp/patterns.json`
+
+Modifica il file, poi riapri il plugin (o ricarica la sessione) per vedere l'effetto. Se il
+JSON contiene errori il plugin non si rompe: torna silenziosamente ai pattern di default.
+Per ripartire da zero, cancella il file: verrà riscritto al prossimo avvio.
+
+### Campi che caratterizzano lo strumento
+
+| Campo | Effetto |
+|---|---|
+| `noteOrderSequence` | Indici nel voicing: `0` = fondamentale, `1` = terza, `2` = quinta… Negativo o oltre la dimensione = ottava sotto/sopra |
+| `rhythmGrid` | Durata di ogni step in frazioni di battuta (`0.25` = un sedicesimo) |
+| `gateLength` | Quanto della durata viene realmente suonato: `0.3` staccato, `1.0` legato |
+| `velocityCurve` | Velocity per step, per gli accenti |
+| `strumOffsetMs` | **Chitarra**: ritardo progressivo tra le note dello stesso step — è ciò che simula la strimpellata |
+| `swingAmount` | Ritarda gli step in levare (0–1) |
+| `humanizeTiming` / `humanizeVelocity` | Variazione casuale |
+| `crescendoCurve` | **Archi**: crescendo sulla nota tenuta |
+
+Il numero di note per step si ricava da `noteOrderSequence.size() / rhythmGrid.size()`:
+è la leva che distingue un arpeggio da un accordo pieno.
+
+```jsonc
+// Accordo pieno: 3 indici su 1 solo step -> suonano insieme
+{ "noteOrderSequence": [0, 1, 2],    "rhythmGrid": [1.0],            "gateLength": [0.95] }
+
+// Arpeggio: 3 indici su 3 step -> una nota per battuta
+{ "noteOrderSequence": [0, 1, 2],    "rhythmGrid": [1.0, 1.0, 1.0],  "gateLength": [0.95, 0.95, 0.95] }
+
+// Strimpellata: 4 note nello stesso step, distanziate di 8 ms l'una dall'altra
+{ "noteOrderSequence": [0, 1, 2, 3], "rhythmGrid": [1.0],            "strumOffsetMs": 8 }
+```
+
+> **Limite attuale**: la griglia Autoplay ha 4 righe per famiglia (`SPEC.md` §5.1), quindi
+> il plugin usa esattamente 16 combinazioni `instrumentFamily` × `intensityLevel` (0-3).
+> Puoi ridefinire liberamente tutte e 16, ma per *aggiungerne* altre e sceglierle servirebbe
+> un selettore di pattern, che non c'è ancora.
+
 ## UI
 
 `/ui/Components` contiene i componenti JUCE riusabili (switcher famiglia, riga di 8 pad accordo,

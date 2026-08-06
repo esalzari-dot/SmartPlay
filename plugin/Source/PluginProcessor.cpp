@@ -12,17 +12,53 @@ namespace
     // v2: aggiunge il flag "free run a trasporto fermo" in coda.
     constexpr int32_t stateFormatVersion = 2;
 
-    // Il dataset e' embeddato nel binario: un plugin distribuito non puo' leggere un
-    // percorso dell'albero sorgente della macchina che lo ha compilato. Un dataset
-    // illeggibile non deve comunque impedire il caricamento del plugin nell'host, quindi
-    // in caso di errore si degrada a una libreria vuota (la griglia non risolvera'
-    // pattern, ma l'editor si apre e l'host resta stabile).
-    PatternLibrary loadEmbeddedPatternLibrary()
+    std::string embeddedPatternJson()
     {
+        return std::string (BinaryData::patterns_json, static_cast<size_t> (BinaryData::patterns_jsonSize));
+    }
+
+    // File modificabile dall'utente. Sta nei Documenti (non in AppData) perche' e' fatto
+    // per essere aperto e modificato a mano.
+    juce::File userPatternFile()
+    {
+        return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                 .getChildFile ("SmartChordArp")
+                 .getChildFile ("patterns.json");
+    }
+
+    // SPEC.md sezione 5.4 vuole il dataset espandibile "senza ricompilare": i pattern di
+    // default sono embeddati nel binario (un plugin distribuito non puo' dipendere da un
+    // percorso della macchina che lo ha compilato), ma al primo avvio vengono scritti su
+    // un file nei Documenti dell'utente, che da quel momento ha la precedenza.
+    //
+    // Nessun errore qui deve impedire il caricamento del plugin nell'host: un file utente
+    // illeggibile ricade sui pattern embeddati, e un dataset embeddato illeggibile ricade
+    // su una libreria vuota.
+    PatternLibrary loadPatternLibrary()
+    {
+        const auto file = userPatternFile();
+
+        if (file.existsAsFile())
+        {
+            try
+            {
+                auto library = PatternLibrary::fromJson (file.loadFileAsString().toStdString());
+                if (! library.getAllPatterns().empty())
+                    return library;
+            }
+            catch (const std::exception&)
+            {
+                // JSON dell'utente non valido: si prosegue con i default embeddati.
+            }
+        }
+        else if (file.getParentDirectory().createDirectory())
+        {
+            file.replaceWithText (embeddedPatternJson());
+        }
+
         try
         {
-            return PatternLibrary::fromJson (std::string (BinaryData::patterns_json,
-                                                           static_cast<size_t> (BinaryData::patterns_jsonSize)));
+            return PatternLibrary::fromJson (embeddedPatternJson());
         }
         catch (const std::exception&)
         {
@@ -62,7 +98,7 @@ SmartChordAudioProcessor::SmartChordAudioProcessor()
         BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)
        #endif
       ),
-      patternLibrary (loadEmbeddedPatternLibrary()),
+      patternLibrary (loadPatternLibrary()),
       chordBank (makeDemoChordBank())
 {
 }
