@@ -14,15 +14,17 @@ Quale file scaricare:
 
 | DAW | File |
 |---|---|
-| **Ableton Live** (Windows) | `SmartChordArp-VST3-Instrument-windows.zip` |
-| **Ableton Live** (macOS) | `SmartChordArp-VST3-Instrument-macos.zip` |
-| Cubase, Reaper, Studio One, FL Studio (Windows) | `SmartChordArp-VST3-windows.zip` |
-| Cubase, Reaper, Studio One, FL Studio (macOS) | `SmartChordArp-VST3-macos.zip` |
-| Logic Pro | `SmartChordArp-AU-macos.zip` |
+| **Ableton Live** (qualsiasi edizione) | `SmartChordArp-VST3-Instrument-<piattaforma>.zip` |
+| Cubase, Reaper, Studio One, FL Studio, Bitwig | `SmartChordArp-VST3-MIDIFX-<piattaforma>.zip` |
+| Logic Pro | `SmartChordArp-AU-MIDIFX-macos.zip` |
 | Senza DAW (app autonoma) | `SmartChordArp-Standalone-<piattaforma>.zip` |
 
-Ableton Live non ospita i plugin VST3 di tipo MIDI FX: lì serve la variante *Instrument*
-(vedi [Plugin](#plugin-vst3--standalone) per il perché e per come instradare il MIDI).
+Nel dubbio, la variante **Instrument** funziona in tutti gli host: la si carica su una
+traccia MIDI e se ne preleva l'uscita da un'altra traccia. La variante **MIDIFX** è più
+comoda dove è supportata (sta nello slot MIDI della stessa traccia dello strumento, senza
+seconda traccia), ma **Ableton Live non la carica** — Live non ospita i MIDI effect VST3 di
+terze parti, in nessuna edizione. L'unico modo per avere un vero MIDI effect in Live sarebbe
+un device Max for Live, che richiede Live Suite ed è un progetto a sé.
 
 Dove copiare la cartella `.vst3` estratta:
 
