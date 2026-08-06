@@ -10,6 +10,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <atomic>
+#include <random>
+#include <vector>
 
 namespace smartchord
 {
@@ -76,6 +78,11 @@ public:
     void setFreeRunWhenStopped (bool shouldFreeRun) { freeRunWhenStopped.store (shouldFreeRun, std::memory_order_relaxed); }
     bool getFreeRunWhenStopped() const { return freeRunWhenStopped.load (std::memory_order_relaxed); }
 
+    // Quando true il rivolto di ogni accordo viene scelto per muovere il meno possibile le
+    // voci rispetto all'accordo precedente, invece di usare quello impostato a mano.
+    void setVoiceLeading (bool shouldLead) { voiceLeadingEnabled.store (shouldLead, std::memory_order_relaxed); }
+    bool getVoiceLeading() const { return voiceLeadingEnabled.load (std::memory_order_relaxed); }
+
     // true (una sola volta) se un keyswitch MIDI ha cambiato lo slot attivo da quando e'
     // stato interrogato l'ultima volta: l'editor lo usa per riallinearsi.
     bool consumeSlotChangedByMidi() { return slotChangedByMidi.exchange (false, std::memory_order_acq_rel); }
@@ -106,6 +113,12 @@ private:
     std::atomic<bool> slotChangedByMidi { false };
 
     std::atomic<bool> freeRunWhenStopped { false };
+    std::atomic<bool> voiceLeadingEnabled { true };
+
+    // Voicing dell'accordo precedente, per il voice leading; e il generatore casuale per
+    // humanizeTiming/humanizeVelocity. Usati solo dal thread audio.
+    std::vector<int> previousVoicing;
+    std::mt19937 humanizeRng { 0x5EED };
 
     MidiOutputManager midiOutputManager;
 

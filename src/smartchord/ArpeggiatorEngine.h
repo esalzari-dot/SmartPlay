@@ -4,6 +4,7 @@
 #include "smartchord/PatternLibrary.h"
 #include "smartchord/VoicingEngine.h"
 
+#include <random>
 #include <vector>
 
 namespace smartchord
@@ -43,12 +44,15 @@ constexpr int defaultVelocity = 100;
 //   (sotto o sopra), ciclando con modulo (SPEC.md sezione 5.2).
 // - clock.globalSwingAmount si somma a pattern.swingAmount e ritarda gli step in levare.
 //
-// humanizeTiming/humanizeVelocity fanno parte dello schema di PatternDefinition ma non
-// sono applicati qui: restano compito del livello che pianifica i MIDI event reali
-// (step 8), per mantenere questa funzione pura e deterministica.
+// - Un indice pari a restNoteIndex e' una pausa: lo step consuma il suo tempo senza
+//   generare eventi.
+// - humanizeTiming/humanizeVelocity vengono applicati solo se si passa un generatore
+//   casuale; con rng == nullptr la funzione resta pura e deterministica (e i test
+//   possono passarne uno con seme fisso).
 std::vector<NoteEvent> generateSequence (const PatternDefinition& pattern,
                                           const VoicingResult& voicing,
-                                          const SyncClock& clock = {});
+                                          const SyncClock& clock = {},
+                                          std::mt19937* rng = nullptr);
 
 // Somma delle durate di rhythmGrid: lunghezza totale, in beat, di un passaggio del
 // pattern (utile per sapere quando un loop deve ripartire da capo).

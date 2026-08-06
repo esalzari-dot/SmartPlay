@@ -19,6 +19,12 @@ SmartChordAudioProcessorEditor::SmartChordAudioProcessorEditor (SmartChordAudioP
         processorRef.setFreeRunWhenStopped (shouldFreeRun);
     };
 
+    panel.setVoiceLeading (processor.getVoiceLeading());
+    panel.onVoiceLeadingChanged = [this] (bool shouldLead)
+    {
+        processorRef.setVoiceLeading (shouldLead);
+    };
+
     addAndMakeVisible (panel);
     setResizable (false, false);
     setSize (panel.getWidth(), panel.getHeight());

@@ -47,6 +47,9 @@ public:
     void setFreeRun (bool shouldFreeRun);
     std::function<void (bool)> onFreeRunChanged;
 
+    void setVoiceLeading (bool shouldLead);
+    std::function<void (bool)> onVoiceLeadingChanged;
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
@@ -58,6 +61,7 @@ private:
 
     juce::Label titleLabel;
     juce::ToggleButton freeRunButton { "Suona a trasporto fermo" };
+    juce::ToggleButton voiceLeadingButton { "Voice leading" };
     FamilySwitcher familySwitcher;
     ChordPadRow chordPadRow;
     AutoplayGridComponent autoplayGrid;

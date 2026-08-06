@@ -57,6 +57,16 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (freeRunButton);
 
+    voiceLeadingButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+    voiceLeadingButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    voiceLeadingButton.setVisible (false);
+    voiceLeadingButton.onClick = [this]
+    {
+        if (onVoiceLeadingChanged != nullptr)
+            onVoiceLeadingChanged (voiceLeadingButton.getToggleState());
+    };
+    addChildComponent (voiceLeadingButton);
+
     setSize (820, 480);
     refresh();
 }
@@ -64,11 +74,17 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
 void AutoplayGridPanel::setFreeRunControlVisible (bool shouldBeVisible)
 {
     freeRunButton.setVisible (shouldBeVisible);
+    voiceLeadingButton.setVisible (shouldBeVisible);
 }
 
 void AutoplayGridPanel::setFreeRun (bool shouldFreeRun)
 {
     freeRunButton.setToggleState (shouldFreeRun, juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::setVoiceLeading (bool shouldLead)
+{
+    voiceLeadingButton.setToggleState (shouldLead, juce::dontSendNotification);
 }
 
 void AutoplayGridPanel::refresh()
@@ -102,7 +118,8 @@ void AutoplayGridPanel::resized()
     auto bounds = getLocalBounds();
 
     auto topBar = bounds.removeFromTop (48).reduced (20, 8);
-    freeRunButton.setBounds (topBar.removeFromRight (220));
+    freeRunButton.setBounds (topBar.removeFromRight (200));
+    voiceLeadingButton.setBounds (topBar.removeFromRight (130));
     titleLabel.setBounds (topBar);
 
     bounds.removeFromTop (16);

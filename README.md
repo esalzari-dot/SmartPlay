@@ -88,6 +88,9 @@ rispetto alle build precedenti, solo core + test.
   MIDI solo mentre la DAW sta suonando (premi Play). Per provare accordi e pattern a
   trasporto fermo attiva **Suona a trasporto fermo** in alto a destra: passa a un clock
   interno al BPM dell'host.
+- **Voice leading** (in alto, attivo di default): sceglie per ogni accordo il rivolto che
+  muove meno le voci rispetto al precedente, invece di saltare. Disattivandolo vale il
+  rivolto che imposti a mano su ogni pad.
 - **Intensità del pattern**: griglia Autoplay 8×4 — colonna = accordo, riga = intensità
   (dal basso, semplice, verso l'alto, complesso). Un click seleziona entrambe insieme.
 
@@ -114,9 +117,13 @@ Per ripartire da zero, cancella il file: verrà riscritto al prossimo avvio.
 | `gateLength` | Quanto della durata viene realmente suonato: `0.3` staccato, `1.0` legato |
 | `velocityCurve` | Velocity per step, per gli accenti |
 | `strumOffsetMs` | **Chitarra**: ritardo progressivo tra le note dello stesso step — è ciò che simula la strimpellata |
+| `strumDirection` | `"up"` (grave→acuto), `"down"` (acuto→grave) o `"alternate"`: alterna a ogni step, come una strimpellata vera |
 | `swingAmount` | Ritarda gli step in levare (0–1) |
-| `humanizeTiming` / `humanizeVelocity` | Variazione casuale |
+| `humanizeTiming` / `humanizeVelocity` | Variazione casuale di attacco (ms) e dinamica |
 | `crescendoCurve` | **Archi**: crescendo sulla nota tenuta |
+
+Una **pausa** si scrive con `null` al posto di un indice: lo step consuma il suo tempo
+senza suonare. È ciò che fa respirare un accompagnamento.
 
 Il numero di note per step si ricava da `noteOrderSequence.size() / rhythmGrid.size()`:
 è la leva che distingue un arpeggio da un accordo pieno.
@@ -128,8 +135,12 @@ Il numero di note per step si ricava da `noteOrderSequence.size() / rhythmGrid.s
 // Arpeggio: 3 indici su 3 step -> una nota per battuta
 { "noteOrderSequence": [0, 1, 2],    "rhythmGrid": [1.0, 1.0, 1.0],  "gateLength": [0.95, 0.95, 0.95] }
 
-// Strimpellata: 4 note nello stesso step, distanziate di 8 ms l'una dall'altra
-{ "noteOrderSequence": [0, 1, 2, 3], "rhythmGrid": [1.0],            "strumOffsetMs": 8 }
+// Strimpellata alternata giù/su, con attacco leggermente irregolare
+{ "noteOrderSequence": [0, 1, 2, 3], "rhythmGrid": [1.0],
+  "strumOffsetMs": 8, "strumDirection": "alternate", "humanizeTiming": 3 }
+
+// Con una pausa sul terzo step: l'accompagnamento respira
+{ "noteOrderSequence": [0, 0, null, -1], "rhythmGrid": [0.5, 0.25, 0.25, 0.5] }
 ```
 
 > **Limite attuale**: la griglia Autoplay ha 4 righe per famiglia (`SPEC.md` §5.1), quindi

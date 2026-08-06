@@ -10,7 +10,8 @@ namespace
 {
     // v1: famiglia + slot attivo + 8 accordi + griglia intensita'.
     // v2: aggiunge il flag "free run a trasporto fermo" in coda.
-    constexpr int32_t stateFormatVersion = 2;
+    // v3: aggiunge il flag "voice leading".
+    constexpr int32_t stateFormatVersion = 3;
 
     std::string embeddedPatternJson()
     {
@@ -140,8 +141,16 @@ void SmartChordAudioProcessor::regenerateAudioThreadLoop (double bpm)
         return;
     }
 
-    const auto voicing = voiceChord (audioChordBank.getActiveChord(), getVoicingProfile (audioFamily));
-    currentLoopEvents = generateSequence (*pattern, voicing, SyncClock { bpm, 0.0 });
+    const auto profile = getVoicingProfile (audioFamily);
+    const auto& chord = audioChordBank.getActiveChord();
+
+    const auto voicing = voiceLeadingEnabled.load (std::memory_order_relaxed)
+        ? voiceChordWithLeading (chord, profile, previousVoicing)
+        : voiceChord (chord, profile);
+
+    previousVoicing = voicing.notes;
+
+    currentLoopEvents = generateSequence (*pattern, voicing, SyncClock { bpm, 0.0 }, &humanizeRng);
     currentLoopLengthBeats = patternLoopLengthBeats (*pattern);
 }
 
@@ -356,6 +365,7 @@ void SmartChordAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
             stream.writeInt (gridState.getIntensity (family, slot));
 
     stream.writeBool (freeRunWhenStopped.load (std::memory_order_relaxed));
+    stream.writeBool (voiceLeadingEnabled.load (std::memory_order_relaxed));
 }
 
 void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -389,9 +399,12 @@ void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeIn
         for (int slot = 0; slot < numChordSlots; ++slot)
             gridState.setIntensity (family, slot, stream.readInt());
 
-    // Assente negli stati salvati dalla v1: resta al default.
+    // Assenti negli stati salvati dalle versioni precedenti: restano al default.
     if (version >= 2)
         freeRunWhenStopped.store (stream.readBool(), std::memory_order_relaxed);
+
+    if (version >= 3)
+        voiceLeadingEnabled.store (stream.readBool(), std::memory_order_relaxed);
 }
 
 } // namespace smartchord

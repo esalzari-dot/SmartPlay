@@ -31,7 +31,8 @@ namespace
 
 std::vector<NoteEvent> generateSequence (const PatternDefinition& pattern,
                                           const VoicingResult& voicing,
-                                          const SyncClock& clock)
+                                          const SyncClock& clock,
+                                          std::mt19937* rng)
 {
     std::vector<NoteEvent> events;
 
@@ -68,15 +69,44 @@ std::vector<NoteEvent> generateSequence (const PatternDefinition& pattern,
         const size_t lastIndex = std::min (firstIndex + static_cast<size_t> (notesPerStep),
                                             pattern.noteOrderSequence.size());
 
+        // La strimpellata verso il basso distanzia le note partendo dall'acuto: e'
+        // l'ordine degli offset a invertirsi, non le note suonate.
+        const bool strumAscending = pattern.strumDirection == StrumDirection::Up
+                                  || (pattern.strumDirection == StrumDirection::Alternate && (step % 2) == 0);
+        const size_t notesInStep = lastIndex - firstIndex;
+
         for (size_t i = firstIndex; i < lastIndex; ++i)
         {
-            const auto resolved = resolveNoteIndex (pattern.noteOrderSequence[i], voicingSize);
+            const int noteIndex = pattern.noteOrderSequence[i];
+            if (noteIndex == restNoteIndex)
+                continue; // pausa: lo step consuma il tempo ma non suona
+
+            const auto resolved = resolveNoteIndex (noteIndex, voicingSize);
             const int midiNote = voicing.notes[static_cast<size_t> (resolved.noteIndex)] + 12 * resolved.octaveShift;
 
-            const double strumOffsetBeats = msToBeats (pattern.strumOffsetMs * static_cast<double> (i - firstIndex), clock.bpm);
-            const double noteStartBeat = stepStartBeat + strumOffsetBeats;
+            const size_t positionInStep = i - firstIndex;
+            const size_t strumSlot = strumAscending ? positionInStep : (notesInStep - 1 - positionInStep);
 
-            events.push_back ({ NoteEvent::Kind::NoteOn, midiNote, velocity, noteStartBeat });
+            const double strumOffsetBeats = msToBeats (pattern.strumOffsetMs * static_cast<double> (strumSlot), clock.bpm);
+            double noteStartBeat = stepStartBeat + strumOffsetBeats;
+            int noteVelocity = velocity;
+
+            if (rng != nullptr)
+            {
+                if (pattern.humanizeTiming > 0.0f)
+                {
+                    std::uniform_real_distribution<double> jitter (-pattern.humanizeTiming, pattern.humanizeTiming);
+                    noteStartBeat = std::max (0.0, noteStartBeat + msToBeats (jitter (*rng), clock.bpm));
+                }
+
+                if (pattern.humanizeVelocity > 0)
+                {
+                    std::uniform_int_distribution<int> jitter (-pattern.humanizeVelocity, pattern.humanizeVelocity);
+                    noteVelocity = std::clamp (noteVelocity + jitter (*rng), 1, 127);
+                }
+            }
+
+            events.push_back ({ NoteEvent::Kind::NoteOn, midiNote, noteVelocity, noteStartBeat });
             events.push_back ({ NoteEvent::Kind::NoteOff, midiNote, 0, noteOffBeat });
         }
 

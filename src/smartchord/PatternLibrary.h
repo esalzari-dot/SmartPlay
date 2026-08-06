@@ -2,11 +2,24 @@
 
 #include "smartchord/VoicingEngine.h"
 
+#include <limits>
 #include <string>
 #include <vector>
 
 namespace smartchord
 {
+
+// Valore di noteOrderSequence che indica una pausa: lo step consuma il suo tempo senza
+// suonare nulla. Nel JSON si scrive "null" fra gli indici, es. [0, null, 2, null].
+constexpr int restNoteIndex = std::numeric_limits<int>::min();
+
+// Ordine con cui le note di uno stesso step vengono distanziate da strumOffsetMs.
+enum class StrumDirection
+{
+    Up,        // dal grave all'acuto (pennata in giu' su chitarra)
+    Down,      // dall'acuto al grave (pennata in su')
+    Alternate  // alterna a ogni step: e' cio' che rende una strimpellata credibile
+};
 
 struct PatternDefinition
 {
@@ -27,6 +40,7 @@ struct PatternDefinition
     int humanizeVelocity = 0;
     float swingAmount = 0.0f;            // 0-1
     float strumOffsetMs = 0.0f;          // opzionale, solo chitarra
+    StrumDirection strumDirection = StrumDirection::Up;
     bool crescendoCurve = false;         // opzionale, solo archi
 };
 
