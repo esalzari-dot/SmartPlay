@@ -8,7 +8,9 @@ namespace smartchord
 
 namespace
 {
-    constexpr int32_t stateFormatVersion = 1;
+    // v1: famiglia + slot attivo + 8 accordi + griglia intensita'.
+    // v2: aggiunge il flag "free run a trasporto fermo" in coda.
+    constexpr int32_t stateFormatVersion = 2;
 
     // Il dataset e' embeddato nel binario: un plugin distribuito non puo' leggere un
     // percorso dell'albero sorgente della macchina che lo ha compilato. Un dataset
@@ -182,7 +184,17 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                                 || audioFamily != previousFamily
                                 || currentIntensity != previousIntensity;
 
-    const double rawPosition = hostProvidesPpq ? hostPpq : internalBeatPosition;
+    const bool freeRun = freeRunWhenStopped.load (std::memory_order_relaxed);
+    const bool shouldPlay = isPlaying || freeRun;
+
+    // Si segue la posizione dell'host finche' il trasporto gira; a trasporto fermo la
+    // PPQ dell'host e' congelata, quindi in free run si passa al clock interno. Tenerlo
+    // allineato mentre l'host comanda rende il passaggio continuo, senza salti di fase.
+    const bool useHostPosition = hostProvidesPpq && isPlaying;
+    if (useHostPosition)
+        internalBeatPosition = hostPpq;
+
+    const double rawPosition = useHostPosition ? hostPpq : internalBeatPosition;
 
     if (selectionChanged)
     {
@@ -202,10 +214,13 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         havePreviousSelection = true;
     }
 
-    if (! isPlaying || currentLoopEvents.empty() || currentLoopLengthBeats <= 0.0)
+    if (! shouldPlay || currentLoopEvents.empty() || currentLoopLengthBeats <= 0.0)
     {
-        if (! hostProvidesPpq)
-            internalBeatPosition += 0.0; // trasporto fermo: non avanzare
+        // Allo stop le note ancora suonanti vanno chiuse, altrimenti restano appese
+        // nello strumento a valle (SPEC.md sezione 7).
+        for (const auto& off : midiOutputManager.allNotesOff())
+            midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
+
         return;
     }
 
@@ -228,7 +243,7 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         midiOutputManager.handleEvent (s.event);
     }
 
-    if (! hostProvidesPpq)
+    if (! useHostPosition)
         internalBeatPosition += blockLengthBeats;
 }
 
@@ -303,13 +318,16 @@ void SmartChordAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     for (auto family : families)
         for (int slot = 0; slot < numChordSlots; ++slot)
             stream.writeInt (gridState.getIntensity (family, slot));
+
+    stream.writeBool (freeRunWhenStopped.load (std::memory_order_relaxed));
 }
 
 void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     juce::MemoryInputStream stream (data, static_cast<size_t> (sizeInBytes), false);
 
-    if (stream.readInt() != stateFormatVersion)
+    const int version = stream.readInt();
+    if (version < 1 || version > stateFormatVersion)
         return; // formato sconosciuto: mantiene lo stato di default piuttosto che corromperlo
 
     const juce::ScopedLock lock (stateLock);
@@ -334,6 +352,10 @@ void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeIn
     for (auto family : families)
         for (int slot = 0; slot < numChordSlots; ++slot)
             gridState.setIntensity (family, slot, stream.readInt());
+
+    // Assente negli stati salvati dalla v1: resta al default.
+    if (version >= 2)
+        freeRunWhenStopped.store (stream.readBool(), std::memory_order_relaxed);
 }
 
 } // namespace smartchord

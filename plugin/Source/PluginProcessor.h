@@ -69,6 +69,13 @@ public:
     void setIntensityAt (InstrumentFamily family, int chordSlot, int intensityLevel);
     void setActiveFamily (InstrumentFamily family);
 
+    // Quando true l'arpeggiatore suona anche a trasporto fermo, usando un clock interno
+    // al posto della posizione PPQ dell'host (utile per provare accordi e pattern senza
+    // far girare la sessione). Di default false: il comportamento sincronizzato al
+    // trasporto e' quello atteso da una DAW.
+    void setFreeRunWhenStopped (bool shouldFreeRun) { freeRunWhenStopped.store (shouldFreeRun, std::memory_order_relaxed); }
+    bool getFreeRunWhenStopped() const { return freeRunWhenStopped.load (std::memory_order_relaxed); }
+
     // true (una sola volta) se un keyswitch MIDI ha cambiato lo slot attivo da quando e'
     // stato interrogato l'ultima volta: l'editor lo usa per riallinearsi.
     bool consumeSlotChangedByMidi() { return slotChangedByMidi.exchange (false, std::memory_order_acq_rel); }
@@ -97,6 +104,8 @@ private:
 
     // Scritto dal thread audio quando un keyswitch cambia lo slot, letto dall'editor.
     std::atomic<bool> slotChangedByMidi { false };
+
+    std::atomic<bool> freeRunWhenStopped { false };
 
     MidiOutputManager midiOutputManager;
 

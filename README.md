@@ -84,6 +84,10 @@ rispetto alle build precedenti, solo core + test.
   keyswitch, **C1–G1** (note MIDI 24-31, con C3 = 60): ognuna seleziona uno degli 8 slot.
   Queste note non vengono passate a valle e stanno sotto la tessitura dei profili
   strumentali, quindi non si sovrappongono a quello che suoni.
+- **Quando suona**: l'arpeggiatore è sincronizzato al trasporto dell'host, quindi genera
+  MIDI solo mentre la DAW sta suonando (premi Play). Per provare accordi e pattern a
+  trasporto fermo attiva **Suona a trasporto fermo** in alto a destra: passa a un clock
+  interno al BPM dell'host.
 - **Intensità del pattern**: griglia Autoplay 8×4 — colonna = accordo, riga = intensità
   (dal basso, semplice, verso l'alto, complesso). Un click seleziona entrambe insieme.
 

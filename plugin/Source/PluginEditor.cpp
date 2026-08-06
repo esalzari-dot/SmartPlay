@@ -12,6 +12,13 @@ SmartChordAudioProcessorEditor::SmartChordAudioProcessorEditor (SmartChordAudioP
 {
     panel.onStateChanged = [this] { pushStateToProcessor(); };
 
+    panel.setFreeRunControlVisible (true);
+    panel.setFreeRun (processor.getFreeRunWhenStopped());
+    panel.onFreeRunChanged = [this] (bool shouldFreeRun)
+    {
+        processorRef.setFreeRunWhenStopped (shouldFreeRun);
+    };
+
     addAndMakeVisible (panel);
     setResizable (false, false);
     setSize (panel.getWidth(), panel.getHeight());

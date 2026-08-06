@@ -47,8 +47,28 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
 
     addAndMakeVisible (patternReadout);
 
+    freeRunButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+    freeRunButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    freeRunButton.setVisible (false);
+    freeRunButton.onClick = [this]
+    {
+        if (onFreeRunChanged != nullptr)
+            onFreeRunChanged (freeRunButton.getToggleState());
+    };
+    addChildComponent (freeRunButton);
+
     setSize (820, 480);
     refresh();
+}
+
+void AutoplayGridPanel::setFreeRunControlVisible (bool shouldBeVisible)
+{
+    freeRunButton.setVisible (shouldBeVisible);
+}
+
+void AutoplayGridPanel::setFreeRun (bool shouldFreeRun)
+{
+    freeRunButton.setToggleState (shouldFreeRun, juce::dontSendNotification);
 }
 
 void AutoplayGridPanel::refresh()
@@ -82,6 +102,7 @@ void AutoplayGridPanel::resized()
     auto bounds = getLocalBounds();
 
     auto topBar = bounds.removeFromTop (48).reduced (20, 8);
+    freeRunButton.setBounds (topBar.removeFromRight (220));
     titleLabel.setBounds (topBar);
 
     bounds.removeFromTop (16);
