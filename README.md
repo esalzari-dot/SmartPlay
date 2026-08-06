@@ -4,6 +4,38 @@ Plugin MIDI FX (VST3/AU) per DAW desktop, scritto in JUCE (C++), ispirato agli S
 
 Permette di selezionare fino a 8 accordi e generare pattern di arpeggio/accompagnamento tramite una griglia **Autoplay** (accordo × intensità), con profili musicali dedicati per Piano, Basso, Chitarra e Archi. Il plugin genera solo eventi MIDI, da instradare verso un VST strumento a scelta dell'utente.
 
+## ⬇️ Download
+
+### **[→ Scarica l'ultima versione](https://github.com/esalzari-dot/SmartPlay/releases/latest)**
+
+(tutte le versioni: [pagina Releases](https://github.com/esalzari-dot/SmartPlay/releases))
+
+Quale file scaricare:
+
+| DAW | File |
+|---|---|
+| **Ableton Live** (Windows) | `SmartChordArp-VST3-Instrument-windows.zip` |
+| **Ableton Live** (macOS) | `SmartChordArp-VST3-Instrument-macos.zip` |
+| Cubase, Reaper, Studio One, FL Studio (Windows) | `SmartChordArp-VST3-windows.zip` |
+| Cubase, Reaper, Studio One, FL Studio (macOS) | `SmartChordArp-VST3-macos.zip` |
+| Logic Pro | `SmartChordArp-AU-macos.zip` |
+| Senza DAW (app autonoma) | `SmartChordArp-Standalone-<piattaforma>.zip` |
+
+Ableton Live non ospita i plugin VST3 di tipo MIDI FX: lì serve la variante *Instrument*
+(vedi [Plugin](#plugin-vst3--standalone) per il perché e per come instradare il MIDI).
+
+Dove copiare la cartella `.vst3` estratta:
+
+- **Windows**: `C:\Program Files\Common Files\VST3\`
+- **macOS**: `~/Library/Audio/Plug-Ins/VST3/` — per l'AU, il `.component` va in `~/Library/Audio/Plug-Ins/Components/`
+- **Linux**: `~/.vst3/`
+
+Poi riavvia la DAW e fai un rescan dei plugin.
+
+> I binari non sono firmati digitalmente: su macOS Gatekeeper li blocca al primo avvio
+> (tasto destro → Apri, oppure `xattr -dr com.apple.quarantine <percorso>`), su Windows
+> può comparire un avviso SmartScreen.
+
 ## Struttura del repository
 
 ```
