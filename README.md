@@ -14,15 +14,17 @@ Quale file scaricare:
 
 | DAW | File |
 |---|---|
-| **Ableton Live** (Windows) | `SmartChordArp-VST3-Instrument-windows.zip` |
-| **Ableton Live** (macOS) | `SmartChordArp-VST3-Instrument-macos.zip` |
-| Cubase, Reaper, Studio One, FL Studio (Windows) | `SmartChordArp-VST3-windows.zip` |
-| Cubase, Reaper, Studio One, FL Studio (macOS) | `SmartChordArp-VST3-macos.zip` |
-| Logic Pro | `SmartChordArp-AU-macos.zip` |
+| **Ableton Live** (qualsiasi edizione) | `SmartChordArp-VST3-Instrument-<piattaforma>.zip` |
+| Cubase, Reaper, Studio One, FL Studio, Bitwig | `SmartChordArp-VST3-MIDIFX-<piattaforma>.zip` |
+| Logic Pro | `SmartChordArp-AU-MIDIFX-macos.zip` |
 | Senza DAW (app autonoma) | `SmartChordArp-Standalone-<piattaforma>.zip` |
 
-Ableton Live non ospita i plugin VST3 di tipo MIDI FX: lì serve la variante *Instrument*
-(vedi [Plugin](#plugin-vst3--standalone) per il perché e per come instradare il MIDI).
+Nel dubbio, la variante **Instrument** funziona in tutti gli host: la si carica su una
+traccia MIDI e se ne preleva l'uscita da un'altra traccia. La variante **MIDIFX** è più
+comoda dove è supportata (sta nello slot MIDI della stessa traccia dello strumento, senza
+seconda traccia), ma **Ableton Live non la carica** — Live non ospita i MIDI effect VST3 di
+terze parti, in nessuna edizione. L'unico modo per avere un vero MIDI effect in Live sarebbe
+un device Max for Live, che richiede Live Suite ed è un progetto a sé.
 
 Dove copiare la cartella `.vst3` estratta:
 
@@ -71,6 +73,82 @@ cd build && ctest --output-on-failure
 
 La prima configurazione scarica JUCE (via `FetchContent`): richiede rete e qualche minuto in più
 rispetto alle build precedenti, solo core + test.
+
+## Come si usa
+
+- **Famiglia strumentale**: switcher in alto (Piano / Bass / Guitar / Strings). Cambia i
+  voicing e il set di pattern disponibili.
+- **Scegliere un accordo da suonare**: click sinistro su uno degli 8 pad.
+- **Cambiare l'accordo contenuto in un pad**: **click destro** sul pad → menu con
+  fondamentale, qualità (14 tipi), rivolto e ottava. La modifica è immediata e viene
+  salvata nella sessione della DAW.
+- **Cambiare accordo mentre suoni**: manda al plugin una nota MIDI nella fascia dei
+  keyswitch, **C1–G1** (note MIDI 24-31, con C3 = 60): ognuna seleziona uno degli 8 slot.
+  Queste note non vengono passate a valle e stanno sotto la tessitura dei profili
+  strumentali, quindi non si sovrappongono a quello che suoni.
+- **Quando suona**: l'arpeggiatore è sincronizzato al trasporto dell'host, quindi genera
+  MIDI solo mentre la DAW sta suonando (premi Play). Per provare accordi e pattern a
+  trasporto fermo attiva **Suona a trasporto fermo** in alto a destra: passa a un clock
+  interno al BPM dell'host.
+- **Voice leading** (in alto, attivo di default): sceglie per ogni accordo il rivolto che
+  muove meno le voci rispetto al precedente, invece di saltare. Disattivandolo vale il
+  rivolto che imposti a mano su ogni pad.
+- **Intensità del pattern**: griglia Autoplay 8×4 — colonna = accordo, riga = intensità
+  (dal basso, semplice, verso l'alto, complesso). Un click seleziona entrambe insieme.
+
+## Personalizzare i pattern
+
+I pattern non sono cablati nel codice: il plugin li legge da un file JSON che puoi
+modificare, senza ricompilare nulla (`SPEC.md` §5.4). Al primo avvio viene creato con i 16
+pattern di default, e da quel momento ha la precedenza sui pattern embeddati nel binario:
+
+- **Windows**: `Documenti\SmartChordArp\patterns.json`
+- **macOS**: `~/Documents/SmartChordArp/patterns.json`
+- **Linux**: `~/Documents/SmartChordArp/patterns.json`
+
+Modifica il file, poi riapri il plugin (o ricarica la sessione) per vedere l'effetto. Se il
+JSON contiene errori il plugin non si rompe: torna silenziosamente ai pattern di default.
+Per ripartire da zero, cancella il file: verrà riscritto al prossimo avvio.
+
+### Campi che caratterizzano lo strumento
+
+| Campo | Effetto |
+|---|---|
+| `noteOrderSequence` | Indici nel voicing: `0` = fondamentale, `1` = terza, `2` = quinta… Negativo o oltre la dimensione = ottava sotto/sopra |
+| `rhythmGrid` | Durata di ogni step in frazioni di battuta (`0.25` = un sedicesimo) |
+| `gateLength` | Quanto della durata viene realmente suonato: `0.3` staccato, `1.0` legato |
+| `velocityCurve` | Velocity per step, per gli accenti |
+| `strumOffsetMs` | **Chitarra**: ritardo progressivo tra le note dello stesso step — è ciò che simula la strimpellata |
+| `strumDirection` | `"up"` (grave→acuto), `"down"` (acuto→grave) o `"alternate"`: alterna a ogni step, come una strimpellata vera |
+| `swingAmount` | Ritarda gli step in levare (0–1) |
+| `humanizeTiming` / `humanizeVelocity` | Variazione casuale di attacco (ms) e dinamica |
+| `crescendoCurve` | **Archi**: crescendo sulla nota tenuta |
+
+Una **pausa** si scrive con `null` al posto di un indice: lo step consuma il suo tempo
+senza suonare. È ciò che fa respirare un accompagnamento.
+
+Il numero di note per step si ricava da `noteOrderSequence.size() / rhythmGrid.size()`:
+è la leva che distingue un arpeggio da un accordo pieno.
+
+```jsonc
+// Accordo pieno: 3 indici su 1 solo step -> suonano insieme
+{ "noteOrderSequence": [0, 1, 2],    "rhythmGrid": [1.0],            "gateLength": [0.95] }
+
+// Arpeggio: 3 indici su 3 step -> una nota per battuta
+{ "noteOrderSequence": [0, 1, 2],    "rhythmGrid": [1.0, 1.0, 1.0],  "gateLength": [0.95, 0.95, 0.95] }
+
+// Strimpellata alternata giù/su, con attacco leggermente irregolare
+{ "noteOrderSequence": [0, 1, 2, 3], "rhythmGrid": [1.0],
+  "strumOffsetMs": 8, "strumDirection": "alternate", "humanizeTiming": 3 }
+
+// Con una pausa sul terzo step: l'accompagnamento respira
+{ "noteOrderSequence": [0, 0, null, -1], "rhythmGrid": [0.5, 0.25, 0.25, 0.5] }
+```
+
+> **Limite attuale**: la griglia Autoplay ha 4 righe per famiglia (`SPEC.md` §5.1), quindi
+> il plugin usa esattamente 16 combinazioni `instrumentFamily` × `intensityLevel` (0-3).
+> Puoi ridefinire liberamente tutte e 16, ma per *aggiungerne* altre e sceglierle servirebbe
+> un selettore di pattern, che non c'è ancora.
 
 ## UI
 

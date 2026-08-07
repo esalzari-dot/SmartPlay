@@ -9,6 +9,16 @@ namespace smartchord
 
 constexpr int numChordBankSlots = 8;
 
+// Prima nota della fascia di keyswitch che seleziona gli slot accordo (SPEC.md sezione 3:
+// "selezionabili via UI pad, MIDI note trigger, o keyswitch"). C1 in convenzione MIDI con
+// C3 = 60, sotto la tessitura utile dei profili strumentali di VoicingEngine, cosi' i
+// keyswitch non si sovrappongono alle note effettivamente suonate.
+constexpr int keyswitchBaseNote = 24;
+
+// Slot selezionato da una nota MIDI di keyswitch, oppure -1 se la nota e' fuori dalla
+// fascia dei keyswitch.
+int keyswitchSlotForNote (int midiNoteNumber);
+
 // Banco di accordi (SPEC.md sezione 3): minimo 8 slot, selezionabili in tempo reale.
 // Ogni slot e' un ChordDefinition; uno slot alla volta e' "attivo" (quello che
 // ArpeggiatorEngine deve eseguire).

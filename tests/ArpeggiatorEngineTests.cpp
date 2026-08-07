@@ -319,3 +319,94 @@ TEST_CASE("scheduleEventsInWindow returns no events for invalid or empty inputs"
     CHECK(scheduleEventsInWindow(loopEvents, 0.0, 0.0, 2.0, 100.0, 200).empty());
     CHECK(scheduleEventsInWindow(loopEvents, 4.0, 0.0, 0.0, 100.0, 200).empty());
 }
+
+TEST_CASE("generateSequence consumes a rest's time without emitting events", "[ArpeggiatorEngine]")
+{
+    PatternDefinition withRest;
+    withRest.noteOrderSequence = {0, restNoteIndex, 2, restNoteIndex};
+    withRest.rhythmGrid = {0.25f, 0.25f, 0.25f, 0.25f};
+    withRest.gateLength = {0.9f, 0.9f, 0.9f, 0.9f};
+
+    const VoicingResult voicing{{60, 64, 67}, 2};
+    const auto events = generateSequence(withRest, voicing);
+
+    // Due note suonate su quattro step: una coppia NoteOn/NoteOff ciascuna.
+    REQUIRE(events.size() == 4);
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 67, 0.5, defaultVelocity)); // il tempo delle pause e' comunque scorso
+
+    // Il loop dura comunque quattro step.
+    CHECK(patternLoopLengthBeats(withRest) == Catch::Approx(1.0));
+}
+
+TEST_CASE("generateSequence reverses the strum offsets for a downward strum", "[ArpeggiatorEngine]")
+{
+    PatternDefinition strum;
+    strum.noteOrderSequence = {0, 1, 2};
+    strum.rhythmGrid = {1.0f};
+    strum.gateLength = {1.0f};
+    strum.strumOffsetMs = 8.0f;
+    strum.strumDirection = StrumDirection::Down;
+
+    const VoicingResult voicing{{60, 64, 67}, 2};
+    const auto events = generateSequence(strum, voicing, SyncClock{120.0, 0.0});
+
+    // Verso il basso: la nota piu' acuta parte per prima, la fondamentale per ultima.
+    CHECK(hasNoteOn(events, 67, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 0.016, defaultVelocity));
+    CHECK(hasNoteOn(events, 60, 0.032, defaultVelocity));
+}
+
+TEST_CASE("generateSequence alternates the strum direction between steps", "[ArpeggiatorEngine]")
+{
+    PatternDefinition strum;
+    strum.noteOrderSequence = {0, 1, 0, 1};
+    strum.rhythmGrid = {1.0f, 1.0f};
+    strum.gateLength = {1.0f, 1.0f};
+    strum.strumOffsetMs = 8.0f;
+    strum.strumDirection = StrumDirection::Alternate;
+
+    const VoicingResult voicing{{60, 64}, 1};
+    const auto events = generateSequence(strum, voicing, SyncClock{120.0, 0.0});
+
+    // Primo step in su: 60 per prima. Secondo step in giu': 64 per prima.
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 0.016, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 1.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 60, 1.016, defaultVelocity));
+}
+
+TEST_CASE("generateSequence applies humanization only when given a generator", "[ArpeggiatorEngine]")
+{
+    PatternDefinition humanized;
+    humanized.noteOrderSequence = {0, 0, 0, 0};
+    humanized.rhythmGrid = {0.25f, 0.25f, 0.25f, 0.25f};
+    humanized.gateLength = {0.5f, 0.5f, 0.5f, 0.5f};
+    humanized.humanizeTiming = 5.0f;
+    humanized.humanizeVelocity = 10;
+
+    const VoicingResult voicing{{60}, 0};
+
+    // Senza generatore resta deterministica: tutte le velocity al default, tempi esatti.
+    const auto plain = generateSequence(humanized, voicing);
+    for (const auto& e : plain)
+        if (e.kind == NoteEvent::Kind::NoteOn)
+            CHECK(e.velocity == defaultVelocity);
+    CHECK(hasNoteOn(plain, 60, 0.25, defaultVelocity));
+
+    // Con un seme fisso il risultato e' riproducibile ma non piu' uguale al nominale.
+    std::mt19937 rngA{12345}, rngB{12345};
+    const auto humanA = generateSequence(humanized, voicing, SyncClock{}, &rngA);
+    const auto humanB = generateSequence(humanized, voicing, SyncClock{}, &rngB);
+
+    REQUIRE(humanA.size() == humanB.size());
+    bool anyDifference = false;
+    for (size_t i = 0; i < humanA.size(); ++i)
+    {
+        CHECK(humanA[i].velocity == humanB[i].velocity);
+        CHECK(humanA[i].beatPosition == Catch::Approx(humanB[i].beatPosition));
+        if (humanA[i].velocity != defaultVelocity)
+            anyDifference = true;
+    }
+    CHECK(anyDifference);
+}

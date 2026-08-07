@@ -1,3 +1,4 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include "smartchord/VoicingEngine.h"
@@ -92,4 +93,35 @@ TEST_CASE("voiceChord keeps notes within the instrument range regardless of octa
         CHECK(note >= 28);
         CHECK(note <= 55);
     }
+}
+
+TEST_CASE("voicingDistance averages the movement of the corresponding voices", "[VoicingEngine]")
+{
+    CHECK(voicingDistance({60, 64, 67}, {60, 64, 67}) == Catch::Approx(0.0));
+    CHECK(voicingDistance({62, 65, 69}, {60, 64, 67}) == Catch::Approx((2 + 1 + 2) / 3.0));
+
+    // Confronta solo tante voci quante ne ha il voicing piu' piccolo.
+    CHECK(voicingDistance({60, 64}, {60, 64, 67}) == Catch::Approx(0.0));
+    CHECK(voicingDistance({}, {60}) == Catch::Approx(0.0));
+}
+
+TEST_CASE("voiceChordWithLeading picks the inversion closest to the previous voicing", "[VoicingEngine]")
+{
+    const auto profile = getVoicingProfile(InstrumentFamily::Piano);
+    const ChordDefinition fMajor{5, ChordQuality::Maj, 0, 0};
+
+    const auto previous = voiceChord({0, ChordQuality::Maj, 0, 0}, profile).notes; // C: 60,64,67
+    const auto led = voiceChordWithLeading(fMajor, profile, previous);
+    const auto plain = voiceChord(fMajor, profile);
+
+    REQUIRE_FALSE(led.notes.empty());
+    CHECK(voicingDistance(led.notes, previous) <= voicingDistance(plain.notes, previous));
+}
+
+TEST_CASE("voiceChordWithLeading falls back to the requested inversion without a previous voicing", "[VoicingEngine]")
+{
+    const auto profile = getVoicingProfile(InstrumentFamily::Piano);
+    const ChordDefinition chord{0, ChordQuality::Maj, 1, 0};
+
+    CHECK(voiceChordWithLeading(chord, profile, {}).notes == voiceChord(chord, profile).notes);
 }

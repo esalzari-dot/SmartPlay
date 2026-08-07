@@ -116,4 +116,53 @@ VoicingResult voiceChord (const ChordDefinition& chord, const VoicingProfile& pr
     return mapToInstrumentRange (invertedTones, chord.rootSemitone, chord.octaveOffset, profile);
 }
 
+double voicingDistance (const std::vector<int>& a, const std::vector<int>& b)
+{
+    const size_t voices = std::min (a.size(), b.size());
+    if (voices == 0)
+        return 0.0;
+
+    double total = 0.0;
+    for (size_t i = 0; i < voices; ++i)
+        total += std::abs (a[i] - b[i]);
+
+    return total / static_cast<double> (voices);
+}
+
+VoicingResult voiceChordWithLeading (const ChordDefinition& chord,
+                                      const VoicingProfile& profile,
+                                      const std::vector<int>& previousNotes)
+{
+    if (previousNotes.empty())
+        return voiceChord (chord, profile);
+
+    const auto chordTones = getChordTones (chord.quality);
+    if (chordTones.empty())
+        return voiceChord (chord, profile);
+
+    VoicingResult best;
+    double bestDistance = 0.0;
+    bool haveBest = false;
+
+    for (int inversion = 0; inversion < static_cast<int> (chordTones.size()); ++inversion)
+    {
+        auto candidateChord = chord;
+        candidateChord.inversion = inversion;
+
+        const auto candidate = voiceChord (candidateChord, profile);
+        if (candidate.notes.empty())
+            continue;
+
+        const double distance = voicingDistance (candidate.notes, previousNotes);
+        if (! haveBest || distance < bestDistance)
+        {
+            best = candidate;
+            bestDistance = distance;
+            haveBest = true;
+        }
+    }
+
+    return haveBest ? best : voiceChord (chord, profile);
+}
+
 } // namespace smartchord

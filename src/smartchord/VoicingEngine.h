@@ -58,4 +58,17 @@ VoicingResult mapToInstrumentRange (const std::vector<int>& invertedTones,
 // Pipeline completa: getChordTones -> applyInversion -> mapToInstrumentRange.
 VoicingResult voiceChord (const ChordDefinition& chord, const VoicingProfile& profile);
 
+// Distanza media, in semitoni, fra due voicing: media delle differenze fra le note
+// corrispondenti, confrontando tante voci quante ne ha il voicing piu' piccolo.
+double voicingDistance (const std::vector<int>& a, const std::vector<int>& b);
+
+// Come voiceChord(), ma sceglie fra tutti i rivolti quello che muove meno le voci
+// rispetto al voicing precedente: e' cio' che evita i salti su ogni cambio d'accordo in
+// un accompagnamento. Il rivolto indicato in ChordDefinition viene ignorato, perche' e'
+// proprio la scelta che questa funzione fa al posto dell'utente.
+// Con previousNotes vuoto ricade su voiceChord() e quindi sul rivolto richiesto.
+VoicingResult voiceChordWithLeading (const ChordDefinition& chord,
+                                      const VoicingProfile& profile,
+                                      const std::vector<int>& previousNotes);
+
 } // namespace smartchord

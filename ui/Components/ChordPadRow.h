@@ -21,7 +21,11 @@ public:
     // dallo stato corrente di ChordBankModule.
     void refreshFrom (const ChordBankModule& bank, juce::Colour accentColour, juce::Colour accentDarkColour);
 
+    // Click sinistro: rende attivo lo slot.
     std::function<void (int)> onChordSelected;
+
+    // Click destro: l'utente ha modificato l'accordo contenuto nello slot.
+    std::function<void (int, const ChordDefinition&)> onChordEdited;
 
     void resized() override;
 
@@ -32,12 +36,18 @@ private:
         ChordPad() : juce::Button ({}) {}
 
         void paintButton (juce::Graphics& g, bool isMouseOverButton, bool isButtonDown) override;
+        void mouseDown (const juce::MouseEvent& event) override;
 
         juce::String rootLabel;
         juce::String qualityLabel;
         bool selected = false;
         juce::Colour accent, accentDark;
+
+        ChordDefinition chord;
+        std::function<void()> onEditRequested;
     };
+
+    void showEditMenuFor (int slot);
 
     std::array<ChordPad, numChordBankSlots> pads;
 };

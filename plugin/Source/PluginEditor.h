@@ -14,7 +14,8 @@ namespace smartchord
 // AudioProcessor in modo thread-safe ad ogni modifica tramite le API dedicate
 // (SPEC.md sezione 8). Riusa AutoplayGridPanel, lo stesso componente dell'harness
 // standalone in /ui.
-class SmartChordAudioProcessorEditor : public juce::AudioProcessorEditor
+class SmartChordAudioProcessorEditor : public juce::AudioProcessorEditor,
+                                        private juce::Timer
 {
 public:
     explicit SmartChordAudioProcessorEditor (SmartChordAudioProcessor&);
@@ -24,11 +25,16 @@ public:
 
 private:
     void pushStateToProcessor();
+    void timerCallback() override;
 
     SmartChordAudioProcessor& processorRef;
 
     ChordBankModule chordBank;
     AutoplayGridState gridState;
+
+    // Evita che il riallineamento a una modifica proveniente dal thread audio venga
+    // rimandato indietro al processor come se fosse un'interazione dell'utente.
+    bool applyingExternalChange = false;
 
     ui::AutoplayGridPanel panel;
 };

@@ -31,6 +31,12 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
         refresh();
     };
 
+    chordPadRow.onChordEdited = [this] (int slot, const ChordDefinition& chord)
+    {
+        chordBank.setChord (slot, chord);
+        refresh();
+    };
+
     addAndMakeVisible (autoplayGrid);
     autoplayGrid.onCellSelected = [this] (int chordSlot, int intensityLevel)
     {
@@ -41,8 +47,44 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
 
     addAndMakeVisible (patternReadout);
 
+    freeRunButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+    freeRunButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    freeRunButton.setVisible (false);
+    freeRunButton.onClick = [this]
+    {
+        if (onFreeRunChanged != nullptr)
+            onFreeRunChanged (freeRunButton.getToggleState());
+    };
+    addChildComponent (freeRunButton);
+
+    voiceLeadingButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+    voiceLeadingButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    voiceLeadingButton.setVisible (false);
+    voiceLeadingButton.onClick = [this]
+    {
+        if (onVoiceLeadingChanged != nullptr)
+            onVoiceLeadingChanged (voiceLeadingButton.getToggleState());
+    };
+    addChildComponent (voiceLeadingButton);
+
     setSize (820, 480);
     refresh();
+}
+
+void AutoplayGridPanel::setFreeRunControlVisible (bool shouldBeVisible)
+{
+    freeRunButton.setVisible (shouldBeVisible);
+    voiceLeadingButton.setVisible (shouldBeVisible);
+}
+
+void AutoplayGridPanel::setFreeRun (bool shouldFreeRun)
+{
+    freeRunButton.setToggleState (shouldFreeRun, juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::setVoiceLeading (bool shouldLead)
+{
+    voiceLeadingButton.setToggleState (shouldLead, juce::dontSendNotification);
 }
 
 void AutoplayGridPanel::refresh()
@@ -76,6 +118,8 @@ void AutoplayGridPanel::resized()
     auto bounds = getLocalBounds();
 
     auto topBar = bounds.removeFromTop (48).reduced (20, 8);
+    freeRunButton.setBounds (topBar.removeFromRight (200));
+    voiceLeadingButton.setBounds (topBar.removeFromRight (130));
     titleLabel.setBounds (topBar);
 
     bounds.removeFromTop (16);

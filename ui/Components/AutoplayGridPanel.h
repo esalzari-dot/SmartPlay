@@ -41,6 +41,15 @@ public:
     // thread-safe verso AudioProcessor.
     std::function<void()> onStateChanged;
 
+    // Interruttore "suona a trasporto fermo": ha senso solo dentro il plugin, dove c'e'
+    // un trasporto dell'host, quindi resta nascosto finche' non lo si abilita.
+    void setFreeRunControlVisible (bool shouldBeVisible);
+    void setFreeRun (bool shouldFreeRun);
+    std::function<void (bool)> onFreeRunChanged;
+
+    void setVoiceLeading (bool shouldLead);
+    std::function<void (bool)> onVoiceLeadingChanged;
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
@@ -51,6 +60,8 @@ private:
     InstrumentFamily activeFamily;
 
     juce::Label titleLabel;
+    juce::ToggleButton freeRunButton { "Suona a trasporto fermo" };
+    juce::ToggleButton voiceLeadingButton { "Voice leading" };
     FamilySwitcher familySwitcher;
     ChordPadRow chordPadRow;
     AutoplayGridComponent autoplayGrid;

@@ -8,19 +8,58 @@ namespace smartchord
 
 namespace
 {
-    constexpr int32_t stateFormatVersion = 1;
+    // v1: famiglia + slot attivo + 8 accordi + griglia intensita'.
+    // v2: aggiunge il flag "free run a trasporto fermo" in coda.
+    // v3: aggiunge il flag "voice leading".
+    constexpr int32_t stateFormatVersion = 3;
 
-    // Il dataset e' embeddato nel binario: un plugin distribuito non puo' leggere un
-    // percorso dell'albero sorgente della macchina che lo ha compilato. Un dataset
-    // illeggibile non deve comunque impedire il caricamento del plugin nell'host, quindi
-    // in caso di errore si degrada a una libreria vuota (la griglia non risolvera'
-    // pattern, ma l'editor si apre e l'host resta stabile).
-    PatternLibrary loadEmbeddedPatternLibrary()
+    std::string embeddedPatternJson()
     {
+        return std::string (BinaryData::patterns_json, static_cast<size_t> (BinaryData::patterns_jsonSize));
+    }
+
+    // File modificabile dall'utente. Sta nei Documenti (non in AppData) perche' e' fatto
+    // per essere aperto e modificato a mano.
+    juce::File userPatternFile()
+    {
+        return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                 .getChildFile ("SmartChordArp")
+                 .getChildFile ("patterns.json");
+    }
+
+    // SPEC.md sezione 5.4 vuole il dataset espandibile "senza ricompilare": i pattern di
+    // default sono embeddati nel binario (un plugin distribuito non puo' dipendere da un
+    // percorso della macchina che lo ha compilato), ma al primo avvio vengono scritti su
+    // un file nei Documenti dell'utente, che da quel momento ha la precedenza.
+    //
+    // Nessun errore qui deve impedire il caricamento del plugin nell'host: un file utente
+    // illeggibile ricade sui pattern embeddati, e un dataset embeddato illeggibile ricade
+    // su una libreria vuota.
+    PatternLibrary loadPatternLibrary()
+    {
+        const auto file = userPatternFile();
+
+        if (file.existsAsFile())
+        {
+            try
+            {
+                auto library = PatternLibrary::fromJson (file.loadFileAsString().toStdString());
+                if (! library.getAllPatterns().empty())
+                    return library;
+            }
+            catch (const std::exception&)
+            {
+                // JSON dell'utente non valido: si prosegue con i default embeddati.
+            }
+        }
+        else if (file.getParentDirectory().createDirectory())
+        {
+            file.replaceWithText (embeddedPatternJson());
+        }
+
         try
         {
-            return PatternLibrary::fromJson (std::string (BinaryData::patterns_json,
-                                                           static_cast<size_t> (BinaryData::patterns_jsonSize)));
+            return PatternLibrary::fromJson (embeddedPatternJson());
         }
         catch (const std::exception&)
         {
@@ -60,7 +99,7 @@ SmartChordAudioProcessor::SmartChordAudioProcessor()
         BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)
        #endif
       ),
-      patternLibrary (loadEmbeddedPatternLibrary()),
+      patternLibrary (loadPatternLibrary()),
       chordBank (makeDemoChordBank())
 {
 }
@@ -102,8 +141,16 @@ void SmartChordAudioProcessor::regenerateAudioThreadLoop (double bpm)
         return;
     }
 
-    const auto voicing = voiceChord (audioChordBank.getActiveChord(), getVoicingProfile (audioFamily));
-    currentLoopEvents = generateSequence (*pattern, voicing, SyncClock { bpm, 0.0 });
+    const auto profile = getVoicingProfile (audioFamily);
+    const auto& chord = audioChordBank.getActiveChord();
+
+    const auto voicing = voiceLeadingEnabled.load (std::memory_order_relaxed)
+        ? voiceChordWithLeading (chord, profile, previousVoicing)
+        : voiceChord (chord, profile);
+
+    previousVoicing = voicing.notes;
+
+    currentLoopEvents = generateSequence (*pattern, voicing, SyncClock { bpm, 0.0 }, &humanizeRng);
     currentLoopLengthBeats = patternLoopLengthBeats (*pattern);
 }
 
@@ -113,6 +160,22 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     buffer.clear(); // MIDI effect: nessun segnale audio in uscita
 
     const int numSamples = buffer.getNumSamples();
+
+    // Keyswitch: una nota nella fascia dedicata seleziona lo slot accordo (SPEC.md
+    // sezione 3). Va letto prima di svuotare il buffer, che poi viene riempito solo con
+    // gli eventi generati - il MIDI in ingresso non passa oltre.
+    int keyswitchSlot = -1;
+    for (const auto metadata : midiMessages)
+    {
+        const auto message = metadata.getMessage();
+        if (! message.isNoteOn())
+            continue;
+
+        const int slot = keyswitchSlotForNote (message.getNoteNumber());
+        if (slot >= 0)
+            keyswitchSlot = slot;
+    }
+
     midiMessages.clear();
 
     if (numSamples <= 0)
@@ -144,10 +207,19 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     // lavoro del thread audio (SPEC.md sezione 8).
     {
         const juce::ScopedLock lock (stateLock);
+
+        // Il keyswitch aggiorna lo stato autorevole, cosi' la scelta sopravvive alla
+        // chiusura dell'editor e finisce nello stato salvato dall'host.
+        if (keyswitchSlot >= 0)
+            chordBank.setActiveSlot (keyswitchSlot);
+
         audioChordBank = chordBank;
         audioGridState = gridState;
         audioFamily = activeFamily;
     }
+
+    if (keyswitchSlot >= 0)
+        slotChangedByMidi.store (true, std::memory_order_release);
 
     const int activeSlot = audioChordBank.getActiveSlot();
     const int currentIntensity = audioGridState.getIntensity (audioFamily, activeSlot);
@@ -157,7 +229,17 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                                 || audioFamily != previousFamily
                                 || currentIntensity != previousIntensity;
 
-    const double rawPosition = hostProvidesPpq ? hostPpq : internalBeatPosition;
+    const bool freeRun = freeRunWhenStopped.load (std::memory_order_relaxed);
+    const bool shouldPlay = isPlaying || freeRun;
+
+    // Si segue la posizione dell'host finche' il trasporto gira; a trasporto fermo la
+    // PPQ dell'host e' congelata, quindi in free run si passa al clock interno. Tenerlo
+    // allineato mentre l'host comanda rende il passaggio continuo, senza salti di fase.
+    const bool useHostPosition = hostProvidesPpq && isPlaying;
+    if (useHostPosition)
+        internalBeatPosition = hostPpq;
+
+    const double rawPosition = useHostPosition ? hostPpq : internalBeatPosition;
 
     if (selectionChanged)
     {
@@ -177,10 +259,13 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         havePreviousSelection = true;
     }
 
-    if (! isPlaying || currentLoopEvents.empty() || currentLoopLengthBeats <= 0.0)
+    if (! shouldPlay || currentLoopEvents.empty() || currentLoopLengthBeats <= 0.0)
     {
-        if (! hostProvidesPpq)
-            internalBeatPosition += 0.0; // trasporto fermo: non avanzare
+        // Allo stop le note ancora suonanti vanno chiuse, altrimenti restano appese
+        // nello strumento a valle (SPEC.md sezione 7).
+        for (const auto& off : midiOutputManager.allNotesOff())
+            midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
+
         return;
     }
 
@@ -203,7 +288,7 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         midiOutputManager.handleEvent (s.event);
     }
 
-    if (! hostProvidesPpq)
+    if (! useHostPosition)
         internalBeatPosition += blockLengthBeats;
 }
 
@@ -278,13 +363,17 @@ void SmartChordAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     for (auto family : families)
         for (int slot = 0; slot < numChordSlots; ++slot)
             stream.writeInt (gridState.getIntensity (family, slot));
+
+    stream.writeBool (freeRunWhenStopped.load (std::memory_order_relaxed));
+    stream.writeBool (voiceLeadingEnabled.load (std::memory_order_relaxed));
 }
 
 void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     juce::MemoryInputStream stream (data, static_cast<size_t> (sizeInBytes), false);
 
-    if (stream.readInt() != stateFormatVersion)
+    const int version = stream.readInt();
+    if (version < 1 || version > stateFormatVersion)
         return; // formato sconosciuto: mantiene lo stato di default piuttosto che corromperlo
 
     const juce::ScopedLock lock (stateLock);
@@ -309,6 +398,13 @@ void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeIn
     for (auto family : families)
         for (int slot = 0; slot < numChordSlots; ++slot)
             gridState.setIntensity (family, slot, stream.readInt());
+
+    // Assenti negli stati salvati dalle versioni precedenti: restano al default.
+    if (version >= 2)
+        freeRunWhenStopped.store (stream.readBool(), std::memory_order_relaxed);
+
+    if (version >= 3)
+        voiceLeadingEnabled.store (stream.readBool(), std::memory_order_relaxed);
 }
 
 } // namespace smartchord

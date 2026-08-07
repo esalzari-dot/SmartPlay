@@ -29,6 +29,28 @@ namespace
         return obj.at (key).get<std::vector<T>>();
     }
 
+    // noteOrderSequence accetta "null" al posto di un indice per indicare una pausa.
+    std::vector<int> readNoteOrderSequence (const nlohmann::json& obj)
+    {
+        std::vector<int> sequence;
+        if (! obj.contains ("noteOrderSequence"))
+            return sequence;
+
+        for (const auto& entry : obj.at ("noteOrderSequence"))
+            sequence.push_back (entry.is_null() ? restNoteIndex : entry.get<int>());
+
+        return sequence;
+    }
+
+    StrumDirection parseStrumDirection (const std::string& name)
+    {
+        if (name == "up")        return StrumDirection::Up;
+        if (name == "down")      return StrumDirection::Down;
+        if (name == "alternate") return StrumDirection::Alternate;
+
+        throw std::runtime_error ("PatternLibrary: strumDirection sconosciuta: " + name);
+    }
+
     PatternDefinition parsePattern (const nlohmann::json& obj)
     {
         PatternDefinition pattern;
@@ -38,7 +60,7 @@ namespace
         pattern.instrumentFamily = parseInstrumentFamily (obj.at ("instrumentFamily").get<std::string>());
         pattern.intensityLevel = obj.at ("intensityLevel").get<int>();
 
-        pattern.noteOrderSequence = readArrayOr<int> (obj, "noteOrderSequence");
+        pattern.noteOrderSequence = readNoteOrderSequence (obj);
         pattern.rhythmGrid = readArrayOr<float> (obj, "rhythmGrid");
         pattern.gateLength = readArrayOr<float> (obj, "gateLength");
         pattern.velocityCurve = readArrayOr<int> (obj, "velocityCurve");
@@ -49,6 +71,7 @@ namespace
         pattern.humanizeVelocity = obj.value ("humanizeVelocity", 0);
         pattern.swingAmount = obj.value ("swingAmount", 0.0f);
         pattern.strumOffsetMs = obj.value ("strumOffsetMs", 0.0f);
+        pattern.strumDirection = parseStrumDirection (obj.value ("strumDirection", std::string ("up")));
         pattern.crescendoCurve = obj.value ("crescendoCurve", false);
 
         return pattern;

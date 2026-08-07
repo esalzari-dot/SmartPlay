@@ -6,6 +6,12 @@
 namespace smartchord
 {
 
+int keyswitchSlotForNote (int midiNoteNumber)
+{
+    const int slot = midiNoteNumber - keyswitchBaseNote;
+    return (slot >= 0 && slot < numChordBankSlots) ? slot : -1;
+}
+
 ChordBankModule::ChordBankModule()
 {
     slots.fill (ChordDefinition{});

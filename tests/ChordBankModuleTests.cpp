@@ -52,6 +52,20 @@ TEST_CASE("ChordBankModule tracks the active slot and exposes its chord", "[Chor
     CHECK(bank.getActiveChord().quality == ChordQuality::Min);
 }
 
+TEST_CASE("keyswitchSlotForNote maps the keyswitch range onto the chord slots", "[ChordBankModule]")
+{
+    for (int slot = 0; slot < numChordBankSlots; ++slot)
+        CHECK(keyswitchSlotForNote(keyswitchBaseNote + slot) == slot);
+}
+
+TEST_CASE("keyswitchSlotForNote rejects notes outside the keyswitch range", "[ChordBankModule]")
+{
+    CHECK(keyswitchSlotForNote(keyswitchBaseNote - 1) == -1);
+    CHECK(keyswitchSlotForNote(keyswitchBaseNote + numChordBankSlots) == -1);
+    CHECK(keyswitchSlotForNote(60) == -1); // C3: nota suonata, non un keyswitch
+    CHECK(keyswitchSlotForNote(0) == -1);
+}
+
 TEST_CASE("ChordBankModule rejects an out-of-range slot", "[ChordBankModule]")
 {
     ChordBankModule bank;
