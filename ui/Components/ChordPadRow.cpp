@@ -4,6 +4,26 @@
 namespace smartchord::ui
 {
 
+namespace
+{
+    // Id delle voci del menu di modifica accordo. A scope di file, non locali alla
+    // funzione: MSVC non consente di usare constexpr locali dentro una lambda con lista
+    // di cattura esplicita (error C3493), a differenza di GCC/Clang.
+    // L'id 0 e' riservato da JUCE per "menu chiuso senza selezione".
+    constexpr int rootIdBase = 100;
+    constexpr int qualityIdBase = 200;
+    constexpr int inversionIdBase = 300;
+    constexpr int octaveIdBase = 400;
+    constexpr int octaveIdOffset = 2; // ottave da -2 a +2
+
+    const std::array<ChordQuality, 14> menuQualities {
+        ChordQuality::Maj, ChordQuality::Min, ChordQuality::Dim, ChordQuality::Aug,
+        ChordQuality::Sus2, ChordQuality::Sus4, ChordQuality::Maj7, ChordQuality::Min7,
+        ChordQuality::Dom7, ChordQuality::Min7b5, ChordQuality::Dim7, ChordQuality::Add9,
+        ChordQuality::Six, ChordQuality::Nine
+    };
+}
+
 void ChordPadRow::ChordPad::paintButton (juce::Graphics& g, bool isMouseOverButton, bool /*isButtonDown*/)
 {
     auto bounds = getLocalBounds().toFloat();
@@ -66,20 +86,7 @@ void ChordPadRow::showEditMenuFor (int slot)
 {
     const auto current = pads[static_cast<size_t> (slot)].chord;
 
-    // Gli id partono da 1: 0 significa "menu chiuso senza selezione".
-    constexpr int rootIdBase = 100;
-    constexpr int qualityIdBase = 200;
-    constexpr int inversionIdBase = 300;
-    constexpr int octaveIdBase = 400;
-    constexpr int octaveIdOffset = 2; // ottave da -2 a +2
-
-    static const std::array<ChordQuality, 14> qualities {
-        ChordQuality::Maj, ChordQuality::Min, ChordQuality::Dim, ChordQuality::Aug,
-        ChordQuality::Sus2, ChordQuality::Sus4, ChordQuality::Maj7, ChordQuality::Min7,
-        ChordQuality::Dom7, ChordQuality::Min7b5, ChordQuality::Dim7, ChordQuality::Add9,
-        ChordQuality::Six, ChordQuality::Nine
-    };
-    const int numQualities = static_cast<int> (qualities.size());
+    const int numQualities = static_cast<int> (menuQualities.size());
 
     juce::PopupMenu rootMenu;
     for (int semitone = 0; semitone < 12; ++semitone)
@@ -87,8 +94,8 @@ void ChordPadRow::showEditMenuFor (int slot)
 
     juce::PopupMenu qualityMenu;
     for (int i = 0; i < numQualities; ++i)
-        qualityMenu.addItem (qualityIdBase + i, qualityAbbreviationFor (qualities[i]),
-                              true, qualities[i] == current.quality);
+        qualityMenu.addItem (qualityIdBase + i, qualityAbbreviationFor (menuQualities[static_cast<size_t> (i)]),
+                              true, menuQualities[static_cast<size_t> (i)] == current.quality);
 
     juce::PopupMenu inversionMenu;
     for (int inversion = 0; inversion < 4; ++inversion)
@@ -122,7 +129,7 @@ void ChordPadRow::showEditMenuFor (int slot)
         else if (result >= inversionIdBase)
             edited.inversion = result - inversionIdBase;
         else if (result >= qualityIdBase)
-            edited.quality = qualities[static_cast<size_t> (result - qualityIdBase)];
+            edited.quality = menuQualities[static_cast<size_t> (result - qualityIdBase)];
         else if (result >= rootIdBase)
             edited.rootSemitone = result - rootIdBase;
 
