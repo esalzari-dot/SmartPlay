@@ -3,6 +3,7 @@
 #include "smartchord/ArpeggiatorEngine.h"
 #include "smartchord/AutoplayGridState.h"
 #include "smartchord/ChordBankModule.h"
+#include "smartchord/ChordBankPresets.h"
 #include "smartchord/ChordRecognizer.h"
 #include "smartchord/LoopClock.h"
 #include "smartchord/MidiOutputManager.h"
@@ -140,6 +141,15 @@ public:
     // sezione 9). 0 quando non sta suonando nulla.
     float getLoopPositionSnapshot() const { return loopPositionNormalized.load (std::memory_order_relaxed); }
 
+    // Preset del banco accordi (SPEC.md non li tratta, ma il meccanismo e' lo stesso di
+    // ChordProgressions): salvati come file su disco nei Documenti dell'utente, cosi'
+    // sopravvivono a una sessione e si possono riusare in un altro progetto. Solo thread
+    // messaggi, mai toccati da processBlock().
+    juce::StringArray getChordBankPresetNames() const;
+    bool findChordBankPreset (const juce::String& name, ChordBankPreset& outPreset) const;
+    void saveChordBankPreset (const juce::String& name, const ChordBankModule& bank);
+    void deleteChordBankPreset (const juce::String& name);
+
     const PatternLibrary& getPatternLibrary() const noexcept { return patternLibrary; }
 
 private:
@@ -150,6 +160,11 @@ private:
 
     // Caricata una sola volta nel costruttore, mai modificata dopo: sicura senza lock.
     PatternLibrary patternLibrary;
+
+    // Preset del banco accordi: caricati una volta nel costruttore, modificati solo dal
+    // thread messaggi (salva/elimina passano da qui e riscrivono il file ogni volta).
+    // Mai letti dal thread audio, quindi non serve alcuna sincronizzazione.
+    std::vector<ChordBankPreset> chordBankPresets;
 
     // I parametri di SPEC.md sezione 8. apvts.getRawParameterValue() restituisce un
     // std::atomic<float>* aggiornato in modo sincrono e lock-free a ogni cambiamento, sia

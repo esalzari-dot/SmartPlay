@@ -1,5 +1,7 @@
 #include "smartchord/ChordDefinition.h"
 
+#include <stdexcept>
+
 namespace smartchord
 {
 
@@ -24,6 +26,49 @@ std::vector<int> getChordTones (ChordQuality quality)
     }
 
     return {};
+}
+
+const char* toString (ChordQuality quality)
+{
+    switch (quality)
+    {
+        case ChordQuality::Maj:    return "Maj";
+        case ChordQuality::Min:    return "Min";
+        case ChordQuality::Dim:    return "Dim";
+        case ChordQuality::Aug:    return "Aug";
+        case ChordQuality::Sus2:   return "Sus2";
+        case ChordQuality::Sus4:   return "Sus4";
+        case ChordQuality::Maj7:   return "Maj7";
+        case ChordQuality::Min7:   return "Min7";
+        case ChordQuality::Dom7:   return "Dom7";
+        case ChordQuality::Min7b5: return "Min7b5";
+        case ChordQuality::Dim7:   return "Dim7";
+        case ChordQuality::Add9:   return "Add9";
+        case ChordQuality::Six:    return "Six";
+        case ChordQuality::Nine:   return "Nine";
+    }
+
+    return "Maj";
+}
+
+ChordQuality chordQualityFromString (const std::string& name)
+{
+    if (name == "Maj")    return ChordQuality::Maj;
+    if (name == "Min")    return ChordQuality::Min;
+    if (name == "Dim")    return ChordQuality::Dim;
+    if (name == "Aug")    return ChordQuality::Aug;
+    if (name == "Sus2")   return ChordQuality::Sus2;
+    if (name == "Sus4")   return ChordQuality::Sus4;
+    if (name == "Maj7")   return ChordQuality::Maj7;
+    if (name == "Min7")   return ChordQuality::Min7;
+    if (name == "Dom7")   return ChordQuality::Dom7;
+    if (name == "Min7b5") return ChordQuality::Min7b5;
+    if (name == "Dim7")   return ChordQuality::Dim7;
+    if (name == "Add9")   return ChordQuality::Add9;
+    if (name == "Six")    return ChordQuality::Six;
+    if (name == "Nine")   return ChordQuality::Nine;
+
+    throw std::runtime_error ("ChordDefinition: qualita' sconosciuta: " + name);
 }
 
 } // namespace smartchord

@@ -30,7 +30,20 @@ private:
         InstrumentFamily::Piano, InstrumentFamily::Bass, InstrumentFamily::Guitar, InstrumentFamily::Strings
     };
 
-    std::array<juce::TextButton, 4> buttons;
+    // Pulsante custom invece di juce::TextButton: serve per disegnare il puntino colore
+    // famiglia e il bagliore sullo stato selezionato, come nel mockup dello studio panel.
+    class SegmentButton : public juce::Button
+    {
+    public:
+        SegmentButton() : juce::Button ({}) {}
+        void paintButton (juce::Graphics& g, bool isMouseOverButton, bool isButtonDown) override;
+
+        juce::String label;
+        juce::Colour accent;
+        bool selected = false;
+    };
+
+    std::array<SegmentButton, 4> buttons;
     InstrumentFamily selectedFamily = InstrumentFamily::Guitar;
 
     void updateButtonStates();

@@ -23,7 +23,7 @@ private:
     {
     public:
         explicit MainWindow (const juce::String& name)
-            : juce::DocumentWindow (name, Palette::background, juce::DocumentWindow::allButtons)
+            : juce::DocumentWindow (name, Palette::ink, juce::DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar (true);
             setContentOwned (new StandaloneComponent(), true);

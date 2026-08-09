@@ -11,6 +11,7 @@ add_executable(smartchord_tests
     ChordDefinitionTests.cpp
     ChordRecognizerTests.cpp
     ChordProgressionsTests.cpp
+    ChordBankPresetsTests.cpp
     VoicingEngineTests.cpp
     PatternLibraryTests.cpp
     AutoplayGridStateTests.cpp

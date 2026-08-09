@@ -9,11 +9,11 @@ PatternReadout::PatternReadout()
     nameLabel.setColour (juce::Label::textColourId, Palette::text);
     addAndMakeVisible (nameLabel);
 
-    subLabel.setFont (juce::FontOptions (11.0f));
-    subLabel.setColour (juce::Label::textColourId, Palette::textMuted);
+    subLabel.setFont (monoFont (10.5f));
+    subLabel.setColour (juce::Label::textColourId, Palette::textDim);
     addAndMakeVisible (subLabel);
 
-    routeLabel.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+    routeLabel.setFont (monoFont (10.5f, juce::Font::bold));
     routeLabel.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (routeLabel);
 }
@@ -26,20 +26,20 @@ void PatternReadout::setContent (const PatternDefinition* pattern, InstrumentFam
     if (pattern != nullptr)
     {
         nameLabel.setText (pattern->displayName, juce::dontSendNotification);
-        subLabel.setText (displayNameFor (family) + "  \xc2\xb7  Intensita' " + juce::String (intensityLevel + 1)
-                               + "/4  \xc2\xb7  Accordo " + chordLabel,
+        subLabel.setText ((displayNameFor (family) + "  \xc2\xb7  INT " + juce::String (intensityLevel + 1)
+                               + "/4  \xc2\xb7  " + chordLabel).toUpperCase(),
                            juce::dontSendNotification);
     }
     else
     {
         nameLabel.setText ("Nessun pattern", juce::dontSendNotification);
-        subLabel.setText (displayNameFor (family) + "  \xc2\xb7  Intensita' " + juce::String (intensityLevel + 1) + "/4",
+        subLabel.setText ((displayNameFor (family) + "  \xc2\xb7  INT " + juce::String (intensityLevel + 1) + "/4").toUpperCase(),
                            juce::dontSendNotification);
     }
 
-    routeLabel.setText ("-> VST " + displayNameFor (family), juce::dontSendNotification);
-    routeLabel.setColour (juce::Label::textColourId, accentColour.darker (0.2f));
-    routeLabel.setColour (juce::Label::backgroundColourId, accentColour.withAlpha (0.15f));
+    routeLabel.setText (("-> VST " + displayNameFor (family)).toUpperCase(), juce::dontSendNotification);
+    routeLabel.setColour (juce::Label::textColourId, accentColour);
+    routeLabel.setColour (juce::Label::backgroundColourId, Palette::text.withAlpha (0.05f));
 
     repaint();
 }
@@ -58,8 +58,8 @@ void PatternReadout::setPlayheadPosition (float normalized)
 
 void PatternReadout::paint (juce::Graphics& g)
 {
-    g.setColour (Palette::panel);
-    g.fillRoundedRectangle (getLocalBounds().toFloat(), 12.0f);
+    g.setColour (Palette::seam);
+    g.fillRoundedRectangle (getLocalBounds().toFloat(), 10.0f);
 
     if (playheadPosition < 0.0f)
         return;
@@ -71,11 +71,14 @@ void PatternReadout::paint (juce::Graphics& g)
     auto track = getLocalBounds().toFloat().removeFromBottom (trackHeight + 4.0f).removeFromBottom (trackHeight)
                      .reduced (16.0f, 0.0f);
 
-    g.setColour (Palette::panelEdge);
+    g.setColour (Palette::text.withAlpha (0.06f));
     g.fillRoundedRectangle (track, trackHeight * 0.5f);
 
+    auto fill = track.removeFromLeft (track.getWidth() * playheadPosition);
+    g.setColour (routeAccent.withAlpha (0.4f));
+    g.fillRoundedRectangle (fill.expanded (0.0f, 1.5f), trackHeight);
     g.setColour (routeAccent);
-    g.fillRoundedRectangle (track.removeFromLeft (track.getWidth() * playheadPosition), trackHeight * 0.5f);
+    g.fillRoundedRectangle (fill, trackHeight * 0.5f);
 }
 
 void PatternReadout::resized()

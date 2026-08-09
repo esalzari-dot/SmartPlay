@@ -2,6 +2,7 @@ add_library(smartchord_core STATIC
     smartchord/ChordDefinition.cpp
     smartchord/ChordRecognizer.cpp
     smartchord/ChordProgressions.cpp
+    smartchord/ChordBankPresets.cpp
     smartchord/VoicingEngine.cpp
     smartchord/PatternLibrary.cpp
     smartchord/AutoplayGridState.cpp

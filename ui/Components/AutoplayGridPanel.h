@@ -90,6 +90,15 @@ public:
     // sezione 9); fuori da [0,1] lo nasconde.
     void setPlayheadPosition (float normalized);
 
+    // Preset del banco accordi salvati dall'utente. Il pannello non li persiste da solo
+    // (non ha accesso al filesystem, ed e' riusato anche dall'harness standalone): apre
+    // il dialogo per il nome e lascia al chiamante il salvataggio/cancellazione vero e
+    // proprio su disco, poi si aspetta un setAvailablePresets() aggiornato.
+    void setAvailablePresets (const juce::StringArray& names);
+    std::function<void (const juce::String& name)> onSavePresetRequested;
+    std::function<void (const juce::String& name)> onLoadPresetRequested;
+    std::function<void (const juce::String& name)> onDeletePresetRequested;
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
@@ -100,6 +109,19 @@ private:
     InstrumentFamily activeFamily;
 
     juce::Label titleLabel;
+
+    // Etichette "eyebrow" mono tracciate, come le sezioni di un pannello hardware
+    // (INSTRUMENT/BANK/PERFORMANCE/CHORD BANK/AUTOPLAY). performanceSectionLabel segue
+    // la visibilita' di swing/gate/ottava (plugin-only, vedi setGlobalControlsVisible);
+    // le altre sono sempre visibili.
+    juce::Label instrumentSectionLabel;
+    juce::Label bankSectionLabel;
+    juce::Label performanceSectionLabel;
+    juce::Label chordBankSectionLabel;
+    juce::Label autoplaySectionLabel;
+    juce::Label simpleCaptionLabel;
+    juce::Label complexCaptionLabel;
+
     juce::ToggleButton freeRunButton { "Suona a trasporto fermo" };
     juce::ToggleButton voiceLeadingButton { "Voice leading" };
     juce::ToggleButton chordFromKeyboardButton { "Accordi da tastiera" };
@@ -108,6 +130,11 @@ private:
     juce::Label progressionLabel;
     juce::ComboBox progressionBox;
     juce::ComboBox keyBox;
+
+    juce::Label presetLabel { {}, "Preset" };
+    juce::ComboBox presetBox;
+    juce::TextButton savePresetButton { "Salva..." };
+    juce::TextButton deletePresetButton { "Elimina" };
 
     juce::Label swingLabel { {}, "Swing" };
     juce::Slider swingSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

@@ -40,6 +40,7 @@ private:
 
         juce::String rootLabel;
         juce::String qualityLabel;
+        int slotIndex = 0;
         bool selected = false;
         juce::Colour accent, accentDark;
 

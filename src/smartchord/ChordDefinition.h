@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 namespace smartchord
@@ -25,6 +26,13 @@ enum class ChordQuality
 
 // Intervalli in semitoni dalla root, per ChordQuality (SPEC.md sezione 3).
 std::vector<int> getChordTones (ChordQuality quality);
+
+// Nome stabile per ChordQuality, usato per serializzare (es. ChordBankPresets) - non e'
+// pensato per la UI (ChordLabel ha le sue abbreviazioni), ma per un round-trip esatto.
+const char* toString (ChordQuality quality);
+
+// Lancia std::runtime_error se name non corrisponde a nessuna qualita'.
+ChordQuality chordQualityFromString (const std::string& name);
 
 struct ChordDefinition
 {

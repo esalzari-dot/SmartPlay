@@ -72,6 +72,34 @@ SmartChordAudioProcessorEditor::SmartChordAudioProcessorEditor (SmartChordAudioP
         processorRef.setHumanizeEnabled (shouldHumanize);
     };
 
+    panel.setAvailablePresets (processor.getChordBankPresetNames());
+
+    panel.onSavePresetRequested = [this] (const juce::String& name)
+    {
+        processorRef.saveChordBankPreset (name, chordBank);
+        panel.setAvailablePresets (processorRef.getChordBankPresetNames());
+    };
+
+    panel.onLoadPresetRequested = [this] (const juce::String& name)
+    {
+        ChordBankPreset preset;
+        if (! processorRef.findChordBankPreset (name, preset))
+            return;
+
+        // Il preset non porta con se' uno slot attivo (non lo cattura, vedi
+        // ChordBankPresets.h): si mantiene quello corrente invece di saltare al primo pad.
+        const int activeSlot = chordBank.getActiveSlot();
+        chordBank = chordBankFromPreset (preset);
+        chordBank.setActiveSlot (activeSlot);
+        panel.refresh();
+    };
+
+    panel.onDeletePresetRequested = [this] (const juce::String& name)
+    {
+        processorRef.deleteChordBankPreset (name);
+        panel.setAvailablePresets (processorRef.getChordBankPresetNames());
+    };
+
     addAndMakeVisible (panel);
     setResizable (false, false);
     setSize (panel.getWidth(), panel.getHeight());
@@ -171,7 +199,7 @@ void SmartChordAudioProcessorEditor::pushStateToProcessor()
 
 void SmartChordAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (ui::Palette::background);
+    g.fillAll (ui::Palette::ink);
 }
 
 void SmartChordAudioProcessorEditor::resized()

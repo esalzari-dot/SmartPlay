@@ -86,6 +86,12 @@ rispetto alle build precedenti, solo core + test.
   dei pad. Otto giri d'armonia pronti (pop I-V-vi-IV, doo-wop, canone, ii-V-I jazz, blues
   di 12 battute, modale…) trasposti nella tonalità che scegli. Le progressioni più corte
   di 9 accordi si ripetono, così tutti i pad restano utilizzabili.
+- **Salvare i tuoi accordi come preset**: accanto a Progressione, **Salva...** cattura il
+  contenuto attuale dei 9 pad con un nome a scelta; il menu **Preset** lo richiama in
+  qualunque altro progetto, **Elimina** lo rimuove. A differenza delle progressioni
+  incorporate, i preset sono tuoi: salvati in
+  `Documenti/SmartChordArp/chordBankPresets.json`, un JSON leggibile e modificabile a
+  mano come `patterns.json`.
 - **Cambiare accordo mentre suoni**: manda al plugin una nota MIDI nella fascia dei
   keyswitch, **C1–G#1** (note MIDI 24-32, con C3 = 60): ognuna seleziona uno dei 9 slot.
   Queste note non vengono passate a valle e stanno sotto la tessitura dei profili
