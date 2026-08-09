@@ -111,6 +111,21 @@ public:
     void setChordFromKeyboard (bool shouldRecognize) { chordFromKeyboard.store (shouldRecognize, std::memory_order_relaxed); }
     bool getChordFromKeyboard() const { return chordFromKeyboard.load (std::memory_order_relaxed); }
 
+    // Quando true, un cambio di accordo/intensita'/famiglia/rate mentre l'arpeggiatore sta
+    // gia' suonando non scatta subito: resta in sospeso e viene applicato al prossimo giro
+    // del loop corrente, cosi' non taglia una nota o uno strum a meta'. A trasporto fermo
+    // (o se non c'era nulla in corso) si applica comunque subito: non avrebbe senso
+    // aspettare un loop che non sta suonando. Di default false, come freeRun/voiceLeading:
+    // e' una preferenza d'uso, non un parametro musicale da automatizzare.
+    void setQuantizeChordSwitch (bool shouldQuantize) { quantizeChordSwitch.store (shouldQuantize, std::memory_order_relaxed); }
+    bool getQuantizeChordSwitch() const { return quantizeChordSwitch.load (std::memory_order_relaxed); }
+
+    // Quando true (default) applica humanizeTiming/humanizeVelocity dove il pattern attivo
+    // li prevede. Disattivandolo la sequenza generata resta deterministica anche per quei
+    // pattern, indipendentemente da cosa dice il loro JSON.
+    void setHumanizeEnabled (bool shouldHumanize) { humanizeEnabled.store (shouldHumanize, std::memory_order_relaxed); }
+    bool getHumanizeEnabled() const { return humanizeEnabled.load (std::memory_order_relaxed); }
+
     // true (una sola volta) se un keyswitch MIDI ha cambiato lo slot attivo da quando e'
     // stato interrogato l'ultima volta: l'editor lo usa per riallinearsi.
     bool consumeSlotChangedByMidi() { return slotChangedByMidi.exchange (false, std::memory_order_acq_rel); }
@@ -168,6 +183,8 @@ private:
     std::atomic<bool> freeRunWhenStopped { false };
     std::atomic<bool> voiceLeadingEnabled { true };
     std::atomic<bool> chordFromKeyboard { false };
+    std::atomic<bool> quantizeChordSwitch { false };
+    std::atomic<bool> humanizeEnabled { true };
 
     // Note attualmente premute sulla tastiera, sopra la fascia dei keyswitch. Usato solo
     // dal thread audio.
@@ -187,6 +204,33 @@ private:
 
     std::atomic<float> loopPositionNormalized { 0.0f };
 
+    // Cambio in sospeso, quando quantizeChordSwitch e' attivo e il loop sta gia' suonando:
+    // i valori "obiettivo" restano qui finche' il loop non ricomincia un giro (vedi
+    // processBlock). Coalizza automaticamente cambi rapidi in sequenza: se ne arriva uno
+    // nuovo prima che quello sospeso venga applicato, lo sostituisce.
+    struct PendingSelection
+    {
+        int activeSlot = 0;
+        InstrumentFamily family = InstrumentFamily::Piano;
+        int intensityLevel = 0;
+        ChordDefinition chord;
+        PatternRate rate = PatternRate::Normal;
+        float swing = 0.0f;
+        float gate = 1.0f;
+        int octaveRange = 0;
+    };
+    PendingSelection pendingSelection;
+    bool hasPendingChange = false;
+
+    // Rilevazione del giro di loop per il cambio in sospeso: il playhead normalizzato
+    // scende invece di salire quando il loop ricomincia. Il cambio si applica all'inizio
+    // del blocco SUCCESSIVO a quello in cui il giro viene rilevato (un blocco di ritardo,
+    // impercettibile) invece che nel mezzo dello stesso blocco: applicarlo li' userebbe
+    // una posizione di playhead ancora relativa al loop vecchio per programmare eventi
+    // del loop nuovo, disallineando tutto.
+    double previousLoopPositionLocal = -1.0;
+    bool loopWrappedLastBlock = false;
+
     int previousActiveSlot = -1;
     InstrumentFamily previousFamily = InstrumentFamily::Piano;
     int previousIntensity = -1;
@@ -195,6 +239,7 @@ private:
     float previousSwing = -1.0f;
     float previousGate = -1.0f;
     int previousOctaveRange = 0;
+    bool previousHumanizeEnabled = true;
     bool havePreviousSelection = false;
 
     double currentSampleRate = 44100.0;

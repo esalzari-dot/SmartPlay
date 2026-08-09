@@ -21,6 +21,7 @@ set(SMARTCHORD_PLUGIN_SOURCES
     ../ui/Components/AutoplayGridComponent.cpp
     ../ui/Components/PatternReadout.cpp
     ../ui/Components/ChordLabel.cpp
+    ../ui/Components/KeyboardChordShortcuts.cpp
 )
 
 # Impostazioni condivise dalle due varianti del plugin (MIDI FX e strumento).

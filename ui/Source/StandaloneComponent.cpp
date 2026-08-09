@@ -18,6 +18,7 @@ namespace
             { 4, ChordQuality::Min,  0, 0 },  // E min
             { 11, ChordQuality::Dim, 0, 0 },  // B dim
             { 0, ChordQuality::Dom7, 0, 0 },  // C7
+            { 7, ChordQuality::Dom7, 0, 0 },  // G7 (nono slot, tastierino: tasto 9)
         };
 
         ChordBankModule bank;
@@ -34,11 +35,25 @@ StandaloneComponent::StandaloneComponent()
 {
     addAndMakeVisible (panel);
     setSize (panel.getWidth(), panel.getHeight());
+
+    setWantsKeyboardFocus (true);
+    grabKeyboardFocus();
 }
 
 void StandaloneComponent::resized()
 {
     panel.setBounds (getLocalBounds());
+}
+
+bool StandaloneComponent::keyPressed (const juce::KeyPress& key)
+{
+    const int slot = chordSlotForKeyPress (key, numChordBankSlots);
+    if (slot < 0)
+        return false;
+
+    chordBank.setActiveSlot (slot);
+    panel.refresh();
+    return true;
 }
 
 } // namespace smartchord::ui

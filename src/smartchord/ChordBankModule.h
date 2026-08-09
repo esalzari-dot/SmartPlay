@@ -7,7 +7,8 @@
 namespace smartchord
 {
 
-constexpr int numChordBankSlots = 8;
+// 9 (non 8): cosi' l'intero tastierino numerico 1-9 puo' mappare uno slot ciascuno.
+constexpr int numChordBankSlots = 9;
 
 // Prima nota della fascia di keyswitch che seleziona gli slot accordo (SPEC.md sezione 3:
 // "selezionabili via UI pad, MIDI note trigger, o keyswitch"). C1 in convenzione MIDI con

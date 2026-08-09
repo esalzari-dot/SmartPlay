@@ -2,7 +2,7 @@
 
 Plugin MIDI FX (VST3/AU) per DAW desktop, scritto in JUCE (C++), ispirato agli Smart Instrument di GarageBand per iOS.
 
-Permette di selezionare fino a 8 accordi e generare pattern di arpeggio/accompagnamento tramite una griglia **Autoplay** (accordo × intensità), con profili musicali dedicati per Piano, Basso, Chitarra e Archi. Il plugin genera solo eventi MIDI, da instradare verso un VST strumento a scelta dell'utente.
+Permette di selezionare fino a 9 accordi e generare pattern di arpeggio/accompagnamento tramite una griglia **Autoplay** (accordo × intensità), con profili musicali dedicati per Piano, Basso, Chitarra e Archi. Il plugin genera solo eventi MIDI, da instradare verso un VST strumento a scelta dell'utente.
 
 ## ⬇️ Download
 
@@ -78,18 +78,21 @@ rispetto alle build precedenti, solo core + test.
 
 - **Famiglia strumentale**: switcher in alto (Piano / Bass / Guitar / Strings). Cambia i
   voicing e il set di pattern disponibili.
-- **Scegliere un accordo da suonare**: click sinistro su uno degli 8 pad.
+- **Scegliere un accordo da suonare**: click sinistro su uno dei 9 pad.
 - **Cambiare l'accordo contenuto in un pad**: **click destro** sul pad → menu con
   fondamentale, qualità (14 tipi), rivolto e ottava. La modifica è immediata e viene
   salvata nella sessione della DAW.
-- **Riempire gli 8 pad in un colpo solo**: menu **Progressione** + tonalità, sopra la riga
+- **Riempire i 9 pad in un colpo solo**: menu **Progressione** + tonalità, sopra la riga
   dei pad. Otto giri d'armonia pronti (pop I-V-vi-IV, doo-wop, canone, ii-V-I jazz, blues
   di 12 battute, modale…) trasposti nella tonalità che scegli. Le progressioni più corte
-  di 8 accordi si ripetono, così tutti i pad restano utilizzabili.
+  di 9 accordi si ripetono, così tutti i pad restano utilizzabili.
 - **Cambiare accordo mentre suoni**: manda al plugin una nota MIDI nella fascia dei
-  keyswitch, **C1–G1** (note MIDI 24-31, con C3 = 60): ognuna seleziona uno degli 8 slot.
+  keyswitch, **C1–G#1** (note MIDI 24-32, con C3 = 60): ognuna seleziona uno dei 9 slot.
   Queste note non vengono passate a valle e stanno sotto la tessitura dei profili
   strumentali, quindi non si sovrappongono a quello che suoni.
+- **Cambiare accordo da tastiera del computer**: quando la finestra del plugin ha il
+  focus, i tasti **1-9** (sia sul tastierino numerico sia sulla riga in alto) selezionano
+  lo slot corrispondente, senza bisogno di un controller MIDI.
 - **Accordi da tastiera** (in alto, da attivare): invece di scegliere un pad, suona
   l'accordo. Le note sopra la fascia dei keyswitch vengono riconosciute (triadi, settime,
   sus, diminuite…) e l'arpeggiatore le usa finché le tieni premute; al rilascio torna
@@ -102,7 +105,15 @@ rispetto alle build precedenti, solo core + test.
 - **Voice leading** (in alto, attivo di default): sceglie per ogni accordo il rivolto che
   muove meno le voci rispetto al precedente, invece di saltare. Disattivandolo vale il
   rivolto che imposti a mano su ogni pad.
-- **Intensità del pattern**: griglia Autoplay 8×4 — colonna = accordo, riga = intensità
+- **Switch a tempo** (sotto Swing/Gate/Ottava, disattivo di default): quando lo attivi, un
+  cambio di accordo/pattern mentre l'arpeggiatore sta già suonando non scatta subito —
+  aspetta che il loop corrente finisca il giro, così non taglia una nota o uno strum a
+  metà. A trasporto fermo, o se non c'era nulla in corso, si applica comunque subito.
+  Disattivato (il default) il cambio è immediato, come sempre.
+- **Humanize** (accanto, attivo di default): quando un pattern prevede variazione casuale
+  di attacco/dinamica (`humanizeTiming`/`humanizeVelocity` nel JSON), disattivando questo
+  interruttore la sequenza torna deterministica per quel pattern, ignorando quei campi.
+- **Intensità del pattern**: griglia Autoplay 9×4 — colonna = accordo, riga = intensità
   (dal basso, semplice, verso l'alto, complesso). Un click seleziona entrambe insieme.
 - **Rate** (in alto a destra): moltiplicatore globale sulla velocità del pattern —
   `1/2x`, `1x`, `Terzine`, `2x`. Lo stesso pattern suona a metà, a doppio o in terzine
@@ -180,8 +191,8 @@ Il numero di note per step si ricava da `noteOrderSequence.size() / rhythmGrid.s
 
 ## UI
 
-`/ui/Components` contiene i componenti JUCE riusabili (switcher famiglia, riga di 8 pad accordo,
-griglia Autoplay 8×4, readout del pattern), che seguono il mockup in
+`/ui/Components` contiene i componenti JUCE riusabili (switcher famiglia, riga di 9 pad accordo,
+griglia Autoplay 9×4, readout del pattern), che seguono il mockup in
 `docs/mockup-v2-garageband-style.html` e operano per riferimento su `ChordBankModule` /
 `AutoplayGridState` / `PatternLibrary` — cosi' lo stesso `AutoplayGridPanel` e' condiviso sia
 dall'harness standalone di sviluppo (`/ui/Source`, stato posseduto localmente) sia dal vero

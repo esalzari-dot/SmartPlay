@@ -76,6 +76,16 @@ public:
     void setOctaveRange (int octaves);
     std::function<void (int)> onOctaveRangeChanged;
 
+    // Quando true un cambio di accordo/pattern mentre si sta gia' suonando aspetta il
+    // prossimo giro del loop invece di scattare subito.
+    void setQuantizeChordSwitch (bool shouldQuantize);
+    std::function<void (bool)> onQuantizeChordSwitchChanged;
+
+    // Quando false, i pattern che prevedono humanizeTiming/humanizeVelocity suonano
+    // comunque in modo deterministico, ignorando quei campi.
+    void setHumanizeEnabled (bool shouldHumanize);
+    std::function<void (bool)> onHumanizeEnabledChanged;
+
     // Posizione normalizzata (0-1) nel loop in esecuzione, per il playhead (SPEC.md
     // sezione 9); fuori da [0,1] lo nasconde.
     void setPlayheadPosition (float normalized);
@@ -105,6 +115,8 @@ private:
     juce::Slider gateSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label octaveLabel { {}, "Ottava" };
     juce::ComboBox octaveBox;
+    juce::ToggleButton quantizeSwitchButton { "Switch a tempo" };
+    juce::ToggleButton humanizeButton { "Humanize" };
 
     void applySelectedProgression();
     void setGlobalControlsVisible (bool shouldBeVisible);
