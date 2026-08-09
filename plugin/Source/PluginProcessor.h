@@ -3,6 +3,7 @@
 #include "smartchord/ArpeggiatorEngine.h"
 #include "smartchord/AutoplayGridState.h"
 #include "smartchord/ChordBankModule.h"
+#include "smartchord/ChordRecognizer.h"
 #include "smartchord/LoopClock.h"
 #include "smartchord/MidiOutputManager.h"
 #include "smartchord/PatternLibrary.h"
@@ -11,6 +12,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <atomic>
+#include <optional>
 #include <random>
 #include <vector>
 
@@ -84,6 +86,17 @@ public:
     void setVoiceLeading (bool shouldLead) { voiceLeadingEnabled.store (shouldLead, std::memory_order_relaxed); }
     bool getVoiceLeading() const { return voiceLeadingEnabled.load (std::memory_order_relaxed); }
 
+    // Moltiplicatore globale sulla velocita' dei pattern: lo stesso pattern suona a
+    // meta', a doppio o in terzine senza doverne scrivere una variante.
+    void setPatternRate (PatternRate rate) { patternRate.store (rate, std::memory_order_relaxed); }
+    PatternRate getPatternRate() const { return patternRate.load (std::memory_order_relaxed); }
+
+    // Quando true, le note suonate sopra la fascia dei keyswitch vengono riconosciute come
+    // accordo e prendono il posto di quello selezionato sul banco, finche' restano premute.
+    void setChordFromKeyboard (bool shouldRecognize) { chordFromKeyboard.store (shouldRecognize, std::memory_order_relaxed); }
+    bool getChordFromKeyboard() const { return chordFromKeyboard.load (std::memory_order_relaxed); }
+
+
     // true (una sola volta) se un keyswitch MIDI ha cambiato lo slot attivo da quando e'
     // stato interrogato l'ultima volta: l'editor lo usa per riallinearsi.
     bool consumeSlotChangedByMidi() { return slotChangedByMidi.exchange (false, std::memory_order_acq_rel); }
@@ -94,7 +107,7 @@ public:
     const PatternLibrary& getPatternLibrary() const noexcept { return patternLibrary; }
 
 private:
-    void regenerateAudioThreadLoop (double bpm);
+    void regenerateAudioThreadLoop (double bpm, const ChordDefinition& chord);
 
     // Caricata una sola volta nel costruttore, mai modificata dopo: sicura senza lock.
     PatternLibrary patternLibrary;
@@ -115,6 +128,13 @@ private:
 
     std::atomic<bool> freeRunWhenStopped { false };
     std::atomic<bool> voiceLeadingEnabled { true };
+    std::atomic<PatternRate> patternRate { PatternRate::Normal };
+    std::atomic<bool> chordFromKeyboard { false };
+
+    // Note attualmente premute sulla tastiera, sopra la fascia dei keyswitch. Usato solo
+    // dal thread audio.
+    std::vector<int> heldKeyboardNotes;
+    std::optional<ChordDefinition> keyboardChord;
 
     // Voicing dell'accordo precedente, per il voice leading; e il generatore casuale per
     // humanizeTiming/humanizeVelocity. Usati solo dal thread audio.
@@ -130,6 +150,8 @@ private:
     int previousActiveSlot = -1;
     InstrumentFamily previousFamily = InstrumentFamily::Piano;
     int previousIntensity = -1;
+    ChordDefinition previousChord;
+    PatternRate previousRate = PatternRate::Normal;
     bool havePreviousSelection = false;
 
     double currentSampleRate = 44100.0;

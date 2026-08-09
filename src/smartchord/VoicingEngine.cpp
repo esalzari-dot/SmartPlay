@@ -105,6 +105,34 @@ VoicingResult mapToInstrumentRange (const std::vector<int>& invertedTones,
         voiced.push_back (note);
     }
 
+    // allowDoubling (SPEC.md sezione 4): quando l'accordo ha meno note di quante il
+    // profilo ne accetta, le voci mancanti si riempiono raddoppiando dal basso all'ottava
+    // superiore. E' cio' che da' corpo a un accordo di tre note su uno strumento che ne
+    // sostiene sei, invece di lasciarlo scarno.
+    if (profile.allowDoubling && profile.maxNotes > 0 && ! voiced.empty())
+    {
+        const std::vector<int> sources = voiced;
+
+        for (int source : sources)
+        {
+            if (static_cast<int> (voiced.size()) >= profile.maxNotes)
+                break;
+
+            const int doubled = source + 12;
+
+            // Fuori tessitura o gia' presente: si passa alla voce successiva invece di
+            // forzare la nota sopra tutte le altre, che sposterebbe il voicing verso
+            // l'acuto invece di riempirlo.
+            if (doubled > profile.midiRangeHigh
+                || std::find (voiced.begin(), voiced.end(), doubled) != voiced.end())
+                continue;
+
+            voiced.push_back (doubled);
+        }
+
+        std::sort (voiced.begin(), voiced.end());
+    }
+
     out.notes = voiced;
     out.topNoteIndex = static_cast<int> (voiced.size()) - 1;
     return out;

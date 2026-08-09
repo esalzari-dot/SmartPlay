@@ -5,8 +5,10 @@
 #include "FamilySwitcher.h"
 #include "PatternReadout.h"
 
+#include "smartchord/ArpeggiatorEngine.h"
 #include "smartchord/AutoplayGridState.h"
 #include "smartchord/ChordBankModule.h"
+#include "smartchord/ChordProgressions.h"
 #include "smartchord/PatternLibrary.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -50,6 +52,13 @@ public:
     void setVoiceLeading (bool shouldLead);
     std::function<void (bool)> onVoiceLeadingChanged;
 
+    // Moltiplicatore globale sulla velocita' dei pattern.
+    void setPatternRate (PatternRate rate);
+    std::function<void (PatternRate)> onPatternRateChanged;
+
+    void setChordFromKeyboard (bool shouldRecognize);
+    std::function<void (bool)> onChordFromKeyboardChanged;
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
@@ -62,6 +71,14 @@ private:
     juce::Label titleLabel;
     juce::ToggleButton freeRunButton { "Suona a trasporto fermo" };
     juce::ToggleButton voiceLeadingButton { "Voice leading" };
+    juce::ToggleButton chordFromKeyboardButton { "Accordi da tastiera" };
+    juce::Label rateLabel;
+    juce::ComboBox rateBox;
+    juce::Label progressionLabel;
+    juce::ComboBox progressionBox;
+    juce::ComboBox keyBox;
+
+    void applySelectedProgression();
     FamilySwitcher familySwitcher;
     ChordPadRow chordPadRow;
     AutoplayGridComponent autoplayGrid;

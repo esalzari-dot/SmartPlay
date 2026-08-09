@@ -25,6 +25,18 @@ SmartChordAudioProcessorEditor::SmartChordAudioProcessorEditor (SmartChordAudioP
         processorRef.setVoiceLeading (shouldLead);
     };
 
+    panel.setPatternRate (processor.getPatternRate());
+    panel.onPatternRateChanged = [this] (PatternRate rate)
+    {
+        processorRef.setPatternRate (rate);
+    };
+
+    panel.setChordFromKeyboard (processor.getChordFromKeyboard());
+    panel.onChordFromKeyboardChanged = [this] (bool shouldRecognize)
+    {
+        processorRef.setChordFromKeyboard (shouldRecognize);
+    };
+
     addAndMakeVisible (panel);
     setResizable (false, false);
     setSize (panel.getWidth(), panel.getHeight());

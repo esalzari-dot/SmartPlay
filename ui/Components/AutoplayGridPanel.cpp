@@ -4,6 +4,28 @@
 namespace smartchord::ui
 {
 
+namespace
+{
+    // L'id 0 e' riservato da JUCE per "nessuna voce selezionata", quindi gli id partono
+    // da 1 e l'enum si ricava sottraendo 1.
+    constexpr int rateIdBase = 1;
+
+    int comboIdFor (PatternRate rate) { return static_cast<int> (rate) + rateIdBase; }
+
+    constexpr int progressionIdBase = 1;
+    constexpr int keyIdBase = 1;
+
+    // I ComboBox di JUCE nascono scuri: senza questo riallineamento stonerebbero sul
+    // pannello chiaro del resto della UI.
+    void styleComboBox (juce::ComboBox& box)
+    {
+        box.setColour (juce::ComboBox::backgroundColourId, Palette::panel);
+        box.setColour (juce::ComboBox::textColourId, Palette::text);
+        box.setColour (juce::ComboBox::outlineColourId, Palette::panelEdge);
+        box.setColour (juce::ComboBox::arrowColourId, Palette::textMuted);
+    }
+}
+
 AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
                                        AutoplayGridState& gridStateIn,
                                        const PatternLibrary& patternLibraryIn,
@@ -67,7 +89,61 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (voiceLeadingButton);
 
-    setSize (820, 480);
+    rateLabel.setText ("Rate", juce::dontSendNotification);
+    rateLabel.setFont (juce::FontOptions (12.0f));
+    rateLabel.setColour (juce::Label::textColourId, Palette::textMuted);
+    rateLabel.setJustificationType (juce::Justification::centredRight);
+    rateLabel.setVisible (false);
+    addChildComponent (rateLabel);
+
+    rateBox.addItem ("1/2x", comboIdFor (PatternRate::Half));
+    rateBox.addItem ("1x", comboIdFor (PatternRate::Normal));
+    rateBox.addItem ("Terzine", comboIdFor (PatternRate::Triplet));
+    rateBox.addItem ("2x", comboIdFor (PatternRate::Double));
+    rateBox.setSelectedId (comboIdFor (PatternRate::Normal), juce::dontSendNotification);
+    styleComboBox (rateBox);
+    rateBox.setVisible (false);
+    rateBox.onChange = [this]
+    {
+        if (onPatternRateChanged != nullptr && rateBox.getSelectedId() >= rateIdBase)
+            onPatternRateChanged (static_cast<PatternRate> (rateBox.getSelectedId() - rateIdBase));
+    };
+    addChildComponent (rateBox);
+
+    chordFromKeyboardButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+    chordFromKeyboardButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    chordFromKeyboardButton.setVisible (false);
+    chordFromKeyboardButton.onClick = [this]
+    {
+        if (onChordFromKeyboardChanged != nullptr)
+            onChordFromKeyboardChanged (chordFromKeyboardButton.getToggleState());
+    };
+    addChildComponent (chordFromKeyboardButton);
+
+    progressionLabel.setText ("Progressione", juce::dontSendNotification);
+    progressionLabel.setFont (juce::FontOptions (12.0f));
+    progressionLabel.setColour (juce::Label::textColourId, Palette::textMuted);
+    addAndMakeVisible (progressionLabel);
+
+    progressionBox.addItem ("-", progressionIdBase);
+    {
+        int id = progressionIdBase + 1;
+        for (const auto& progression : getChordProgressions())
+            progressionBox.addItem (progression.displayName, id++);
+    }
+    progressionBox.setSelectedId (progressionIdBase, juce::dontSendNotification);
+    styleComboBox (progressionBox);
+    progressionBox.onChange = [this] { applySelectedProgression(); };
+    addAndMakeVisible (progressionBox);
+
+    for (int semitone = 0; semitone < 12; ++semitone)
+        keyBox.addItem (noteNameFor (semitone), keyIdBase + semitone);
+    keyBox.setSelectedId (keyIdBase, juce::dontSendNotification);
+    styleComboBox (keyBox);
+    keyBox.onChange = [this] { applySelectedProgression(); };
+    addAndMakeVisible (keyBox);
+
+    setSize (820, 520);
     refresh();
 }
 
@@ -75,6 +151,9 @@ void AutoplayGridPanel::setFreeRunControlVisible (bool shouldBeVisible)
 {
     freeRunButton.setVisible (shouldBeVisible);
     voiceLeadingButton.setVisible (shouldBeVisible);
+    rateLabel.setVisible (shouldBeVisible);
+    rateBox.setVisible (shouldBeVisible);
+    chordFromKeyboardButton.setVisible (shouldBeVisible);
 }
 
 void AutoplayGridPanel::setFreeRun (bool shouldFreeRun)
@@ -85,6 +164,36 @@ void AutoplayGridPanel::setFreeRun (bool shouldFreeRun)
 void AutoplayGridPanel::setVoiceLeading (bool shouldLead)
 {
     voiceLeadingButton.setToggleState (shouldLead, juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::setPatternRate (PatternRate rate)
+{
+    rateBox.setSelectedId (comboIdFor (rate), juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::setChordFromKeyboard (bool shouldRecognize)
+{
+    chordFromKeyboardButton.setToggleState (shouldRecognize, juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::applySelectedProgression()
+{
+    // La voce "-" non e' una progressione: e' lo stato in cui il banco resta com'e'.
+    const int index = progressionBox.getSelectedId() - progressionIdBase - 1;
+    if (index < 0)
+        return;
+
+    const auto& all = getChordProgressions();
+    if (index >= static_cast<int> (all.size()))
+        return;
+
+    const int tonic = keyBox.getSelectedId() - keyIdBase;
+    const auto activeSlot = chordBank.getActiveSlot();
+
+    chordBank = buildChordBank (all[static_cast<size_t> (index)], tonic);
+    chordBank.setActiveSlot (activeSlot);
+
+    refresh();
 }
 
 void AutoplayGridPanel::refresh()
@@ -118,18 +227,28 @@ void AutoplayGridPanel::resized()
     auto bounds = getLocalBounds();
 
     auto topBar = bounds.removeFromTop (48).reduced (20, 8);
-    freeRunButton.setBounds (topBar.removeFromRight (200));
-    voiceLeadingButton.setBounds (topBar.removeFromRight (130));
+    rateBox.setBounds (topBar.removeFromRight (90).reduced (0, 3));
+    rateLabel.setBounds (topBar.removeFromRight (40));
+    freeRunButton.setBounds (topBar.removeFromRight (185));
+    voiceLeadingButton.setBounds (topBar.removeFromRight (120));
+    chordFromKeyboardButton.setBounds (topBar.removeFromRight (155));
     titleLabel.setBounds (topBar);
 
     bounds.removeFromTop (16);
     familySwitcher.setBounds (bounds.removeFromTop (44).reduced (20, 0));
 
-    bounds.removeFromTop (18);
+    bounds.removeFromTop (12);
+    auto progressionBar = bounds.removeFromTop (26).reduced (20, 0);
+    progressionLabel.setBounds (progressionBar.removeFromLeft (86));
+    progressionBox.setBounds (progressionBar.removeFromLeft (230));
+    progressionBar.removeFromLeft (8);
+    keyBox.setBounds (progressionBar.removeFromLeft (70));
+
+    bounds.removeFromTop (10);
     chordPadRow.setBounds (bounds.removeFromTop (56).reduced (20, 0));
 
-    bounds.removeFromTop (14);
-    autoplayGrid.setBounds (bounds.removeFromTop (200).reduced (20, 0));
+    bounds.removeFromTop (12);
+    autoplayGrid.setBounds (bounds.removeFromTop (190).reduced (20, 0));
 
     bounds.removeFromTop (14);
     patternReadout.setBounds (bounds.removeFromTop (60).reduced (20, 0));

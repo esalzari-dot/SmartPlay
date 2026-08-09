@@ -526,3 +526,378 @@ TEST_CASE("un pattern completo si chiude su ogni nota che apre, loop dopo loop",
 
     CHECK(stillSounding == 1);
 }
+
+// --- Moltiplicatore globale di velocita' ------------------------------------------
+
+TEST_CASE("rateMultiplierFor mappa i rate sui rispettivi fattori", "[ArpeggiatorEngine]")
+{
+    CHECK(rateMultiplierFor(PatternRate::Half) == Catch::Approx(2.0));
+    CHECK(rateMultiplierFor(PatternRate::Normal) == Catch::Approx(1.0));
+    CHECK(rateMultiplierFor(PatternRate::Triplet) == Catch::Approx(2.0 / 3.0));
+    CHECK(rateMultiplierFor(PatternRate::Double) == Catch::Approx(0.5));
+}
+
+TEST_CASE("il rate globale scala le posizioni degli step e la lunghezza del loop", "[ArpeggiatorEngine]")
+{
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0, 1, 2, 0};
+    pattern.rhythmGrid = {0.25f, 0.25f, 0.25f, 0.25f};
+    pattern.gateLength = {0.5f, 0.5f, 0.5f, 0.5f};
+
+    const VoicingResult voicing{{60, 64, 67}, 2};
+
+    SyncClock doubleSpeed;
+    doubleSpeed.rateMultiplier = rateMultiplierFor(PatternRate::Double);
+
+    const auto events = generateSequence(pattern, voicing, doubleSpeed);
+
+    CHECK(patternLoopLengthBeats(pattern, doubleSpeed.rateMultiplier) == Catch::Approx(0.5));
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 0.125, defaultVelocity));
+    CHECK(hasNoteOn(events, 67, 0.25, defaultVelocity));
+    CHECK(hasNoteOff(events, 60, 0.0625)); // gate 0.5 di uno step lungo 0.125
+}
+
+TEST_CASE("il rate a terzine comprime il loop di un terzo", "[ArpeggiatorEngine]")
+{
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0, 1, 2};
+    pattern.rhythmGrid = {0.5f, 0.5f, 0.5f};
+
+    CHECK(patternLoopLengthBeats(pattern, rateMultiplierFor(PatternRate::Triplet)) == Catch::Approx(1.0));
+}
+
+TEST_CASE("un rate non valido viene ignorato invece di azzerare il pattern", "[ArpeggiatorEngine]")
+{
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0, 1};
+    pattern.rhythmGrid = {1.0f, 1.0f};
+
+    const VoicingResult voicing{{60, 64}, 1};
+
+    SyncClock broken;
+    broken.rateMultiplier = 0.0;
+
+    const auto events = generateSequence(pattern, voicing, broken);
+
+    CHECK(hasNoteOn(events, 64, 1.0, defaultVelocity));
+    CHECK(patternLoopLengthBeats(pattern, 0.0) == Catch::Approx(2.0));
+}
+
+// --- crescendoCurve ---------------------------------------------------------------
+
+TEST_CASE("crescendoCurve emette una rampa di CC11 lungo tutto il loop", "[ArpeggiatorEngine]")
+{
+    PatternDefinition swell;
+    swell.noteOrderSequence = {0, 1, 2, 3};
+    swell.rhythmGrid = {4.0f}; // una sola nota tenuta: solo il CC puo' farla gonfiare
+    swell.gateLength = {1.0f};
+    swell.crescendoCurve = true;
+
+    const VoicingResult voicing{{60, 64, 67, 72}, 2};
+    const auto events = generateSequence(swell, voicing);
+
+    std::vector<NoteEvent> ccEvents;
+    for (const auto& e : events)
+        if (e.kind == NoteEvent::Kind::ControlChange)
+            ccEvents.push_back(e);
+
+    REQUIRE_FALSE(ccEvents.empty());
+
+    for (const auto& e : ccEvents)
+    {
+        CHECK(e.midiNote == expressionController);
+        CHECK(e.velocity >= 0);
+        CHECK(e.velocity <= 127);
+        CHECK(e.beatPosition >= 0.0);
+        CHECK(e.beatPosition < patternLoopLengthBeats(swell));
+    }
+
+    // Il crescendo parte piano e cresce senza mai tornare indietro.
+    CHECK(ccEvents.front().velocity == crescendoStartValue);
+    CHECK(ccEvents.back().velocity > ccEvents.front().velocity);
+
+    for (size_t i = 1; i < ccEvents.size(); ++i)
+    {
+        INFO("punto " << i);
+        CHECK(ccEvents[i].velocity >= ccEvents[i - 1].velocity);
+        CHECK(ccEvents[i].beatPosition > ccEvents[i - 1].beatPosition);
+    }
+}
+
+TEST_CASE("crescendoCurve scala anche le velocity, in crescita lungo il loop", "[ArpeggiatorEngine]")
+{
+    PatternDefinition swell;
+    swell.noteOrderSequence = {0, 0, 0, 0};
+    swell.rhythmGrid = {1.0f, 1.0f, 1.0f, 1.0f};
+    swell.velocityCurve = {100, 100, 100, 100};
+    swell.crescendoCurve = true;
+
+    const VoicingResult voicing{{60}, 0};
+    const auto events = generateSequence(swell, voicing);
+
+    std::vector<int> velocities;
+    for (const auto& e : events)
+        if (e.kind == NoteEvent::Kind::NoteOn)
+            velocities.push_back(e.velocity);
+
+    REQUIRE(velocities.size() == 4);
+    CHECK(velocities[0] < velocities[1]);
+    CHECK(velocities[1] < velocities[2]);
+    CHECK(velocities[2] < velocities[3]);
+    CHECK(velocities[3] <= 100); // il crescendo non supera mai la velocity scritta nel pattern
+}
+
+TEST_CASE("senza crescendoCurve non viene emesso alcun control change", "[ArpeggiatorEngine]")
+{
+    PatternDefinition plain;
+    plain.noteOrderSequence = {0, 1};
+    plain.rhythmGrid = {1.0f, 1.0f};
+
+    const VoicingResult voicing{{60, 64}, 1};
+    const auto events = generateSequence(plain, voicing);
+
+    for (const auto& e : events)
+        CHECK(e.kind != NoteEvent::Kind::ControlChange);
+}
+
+TEST_CASE("i control change precedono le note che cadono sullo stesso campione", "[ArpeggiatorEngine]")
+{
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.0},
+        {NoteEvent::Kind::NoteOff, 60, 0, 1.0},
+        {NoteEvent::Kind::ControlChange, expressionController, 40, 0.0},
+    };
+
+    const auto scheduled = scheduleEventsInWindow(loopEvents, 2.0, 0.0, 0.5, 100.0, 50);
+
+    REQUIRE(scheduled.size() == 2);
+    CHECK(scheduled[0].event.kind == NoteEvent::Kind::ControlChange);
+    CHECK(scheduled[1].event.kind == NoteEvent::Kind::NoteOn);
+}
+
+TEST_CASE("MidiOutputManager ignora i control change nel conteggio delle note", "[ArpeggiatorEngine]")
+{
+    MidiOutputManager output;
+
+    output.handleEvent({NoteEvent::Kind::ControlChange, expressionController, 90, 0.0});
+    CHECK(output.getActiveNotes().empty());
+
+    output.handleEvent({NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.0});
+    output.handleEvent({NoteEvent::Kind::ControlChange, expressionController, 120, 0.5});
+    CHECK(output.getActiveNotes() == std::vector<int>{60});
+
+    output.handleEvent({NoteEvent::Kind::NoteOff, 60, 0, 1.0});
+    CHECK(output.getActiveNotes().empty());
+}
+
+// --- octaveSpread e loopLength ----------------------------------------------------
+
+TEST_CASE("octaveSpread fa salire il pattern di ottava lungo il loop", "[ArpeggiatorEngine]")
+{
+    PatternDefinition rising;
+    rising.noteOrderSequence = {0, 0, 0, 0};
+    rising.rhythmGrid = {0.25f, 0.25f, 0.25f, 0.25f};
+    rising.octaveSpread = 1;
+
+    const VoicingResult voicing{{60}, 0};
+    const auto events = generateSequence(rising, voicing);
+
+    // Quattro step su due bande: i primi due nell'ottava di partenza, gli altri sopra.
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 60, 0.25, defaultVelocity));
+    CHECK(hasNoteOn(events, 72, 0.5, defaultVelocity));
+    CHECK(hasNoteOn(events, 72, 0.75, defaultVelocity));
+}
+
+TEST_CASE("un octaveSpread negativo fa scendere il pattern", "[ArpeggiatorEngine]")
+{
+    PatternDefinition falling;
+    falling.noteOrderSequence = {0, 0};
+    falling.rhythmGrid = {0.5f, 0.5f};
+    falling.octaveSpread = -1;
+
+    const VoicingResult voicing{{60}, 0};
+    const auto events = generateSequence(falling, voicing);
+
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 48, 0.5, defaultVelocity));
+}
+
+TEST_CASE("octaveSpread a zero lascia il pattern dov'e'", "[ArpeggiatorEngine]")
+{
+    PatternDefinition flat;
+    flat.noteOrderSequence = {0, 1, 2, 0};
+    flat.rhythmGrid = {0.25f, 0.25f, 0.25f, 0.25f};
+
+    const VoicingResult voicing{{60, 64, 67}, 2};
+    const auto events = generateSequence(flat, voicing);
+
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 0.25, defaultVelocity));
+    CHECK(hasNoteOn(events, 67, 0.5, defaultVelocity));
+    CHECK(hasNoteOn(events, 60, 0.75, defaultVelocity));
+}
+
+TEST_CASE("loopLength ripete la griglia e ruota la sequenza a ogni passaggio", "[ArpeggiatorEngine]")
+{
+    PatternDefinition twoBars;
+    twoBars.noteOrderSequence = {0, 1, 2};
+    twoBars.rhythmGrid = {1.0f, 1.0f, 1.0f};
+    twoBars.loopLength = 2;
+
+    const VoicingResult voicing{{60, 64, 67}, 2};
+    const auto events = generateSequence(twoBars, voicing);
+
+    CHECK(patternLoopLengthBeats(twoBars) == Catch::Approx(6.0));
+
+    // Primo passaggio: la sequenza cosi' com'e'.
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 1.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 67, 2.0, defaultVelocity));
+
+    // Secondo passaggio: ruotata di uno, quindi non e' una copia del primo.
+    CHECK(hasNoteOn(events, 64, 3.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 67, 4.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 60, 5.0, defaultVelocity));
+}
+
+TEST_CASE("loopLength a 0 o 1 lascia il pattern a un solo passaggio", "[ArpeggiatorEngine]")
+{
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0, 1};
+    pattern.rhythmGrid = {1.0f, 1.0f};
+
+    const VoicingResult voicing{{60, 64}, 1};
+    const auto single = generateSequence(pattern, voicing);
+
+    pattern.loopLength = 1;
+    const auto explicitSingle = generateSequence(pattern, voicing);
+
+    CHECK(patternLoopLengthBeats(pattern) == Catch::Approx(2.0));
+    REQUIRE(single.size() == explicitSingle.size());
+    for (size_t i = 0; i < single.size(); ++i)
+    {
+        CHECK(single[i].midiNote == explicitSingle[i].midiNote);
+        CHECK(single[i].beatPosition == Catch::Approx(explicitSingle[i].beatPosition));
+    }
+}
+
+TEST_CASE("loopLength e octaveSpread si distribuiscono sull'intero ciclo", "[ArpeggiatorEngine]")
+{
+    PatternDefinition twoBars;
+    twoBars.noteOrderSequence = {0, 0};
+    twoBars.rhythmGrid = {1.0f, 1.0f};
+    twoBars.loopLength = 2;
+    twoBars.octaveSpread = 1;
+
+    const VoicingResult voicing{{60}, 0};
+    const auto events = generateSequence(twoBars, voicing);
+
+    // Quattro step in tutto: la banda di ottava cambia a meta' ciclo, non a meta' battuta.
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 60, 1.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 72, 2.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 72, 3.0, defaultVelocity));
+}
+
+TEST_CASE("loopLength conserva i raggruppamenti di uno strum", "[ArpeggiatorEngine]")
+{
+    // Due note per step: la rotazione deve muoversi di un gruppo intero, altrimenti
+    // spezzerebbe le coppie che formano la strimpellata.
+    PatternDefinition strummed;
+    strummed.noteOrderSequence = {0, 1, 2, 3};
+    strummed.rhythmGrid = {1.0f, 1.0f};
+    strummed.loopLength = 2;
+
+    const VoicingResult voicing{{60, 64, 67, 72}, 3};
+    const auto events = generateSequence(strummed, voicing);
+
+    CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 67, 1.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 72, 1.0, defaultVelocity));
+
+    // Secondo passaggio: i gruppi si scambiano, restando gruppi.
+    CHECK(hasNoteOn(events, 67, 2.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 72, 2.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 60, 3.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 3.0, defaultVelocity));
+}
+
+// --- Palm mute e strimpellata parziale ---------------------------------------------
+
+TEST_CASE("palmMute accorcia e attenua solo gli step marcati", "[ArpeggiatorEngine]")
+{
+    PatternDefinition chugging;
+    chugging.noteOrderSequence = {0, 0, 0, 0};
+    chugging.rhythmGrid = {0.25f, 0.25f, 0.25f, 0.25f};
+    chugging.gateLength = {0.8f, 0.8f, 0.8f, 0.8f};
+    chugging.velocityCurve = {100, 100, 100, 100};
+    chugging.palmMute = {true, false, true, false};
+
+    const VoicingResult voicing{{60}, 0};
+    const auto events = generateSequence(chugging, voicing);
+
+    // Step 0 e 2 mutati: nota piu' corta (gate 0.8 * 0.35) e piu' piano.
+    CHECK(hasNoteOff(events, 60, 0.25 * 0.8 * palmMuteGateScale));
+    CHECK(hasNoteOff(events, 60, 0.25 + 0.25 * 0.8));
+
+    std::vector<int> velocities;
+    for (const auto& e : events)
+        if (e.kind == NoteEvent::Kind::NoteOn)
+            velocities.push_back(e.velocity);
+
+    REQUIRE(velocities.size() == 4);
+    CHECK(velocities[0] == 70);
+    CHECK(velocities[1] == 100);
+    CHECK(velocities[2] == 70);
+    CHECK(velocities[3] == 100);
+}
+
+TEST_CASE("un array palmMute piu' corto della griglia lascia liberi gli step mancanti", "[ArpeggiatorEngine]")
+{
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0, 0, 0};
+    pattern.rhythmGrid = {1.0f, 1.0f, 1.0f};
+    pattern.velocityCurve = {100, 100, 100};
+    pattern.palmMute = {true};
+
+    const VoicingResult voicing{{60}, 0};
+    const auto events = generateSequence(pattern, voicing);
+
+    std::vector<int> velocities;
+    for (const auto& e : events)
+        if (e.kind == NoteEvent::Kind::NoteOn)
+            velocities.push_back(e.velocity);
+
+    REQUIRE(velocities.size() == 3);
+    CHECK(velocities[0] == 70);
+    CHECK(velocities[1] == 100);
+    CHECK(velocities[2] == 100);
+}
+
+TEST_CASE("una strimpellata parziale si ottiene con le pause dentro lo step", "[ArpeggiatorEngine]")
+{
+    // Quattro indici su due step: il secondo step suona solo le corde gravi.
+    PatternDefinition partial;
+    partial.noteOrderSequence = {0, 1, 2, restNoteIndex};
+    partial.rhythmGrid = {1.0f, 1.0f};
+    partial.gateLength = {1.0f, 1.0f};
+
+    const VoicingResult voicing{{60, 64, 67}, 2};
+    const auto events = generateSequence(partial, voicing);
+
+    // Primo step: due note. Secondo step: una sola, la pausa non suona.
+    int firstStepNotes = 0;
+    int secondStepNotes = 0;
+    for (const auto& e : events)
+    {
+        if (e.kind != NoteEvent::Kind::NoteOn)
+            continue;
+        (e.beatPosition < 1.0 ? firstStepNotes : secondStepNotes)++;
+    }
+
+    CHECK(firstStepNotes == 2);
+    CHECK(secondStepNotes == 1);
+}

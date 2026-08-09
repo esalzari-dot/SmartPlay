@@ -82,10 +82,19 @@ rispetto alle build precedenti, solo core + test.
 - **Cambiare l'accordo contenuto in un pad**: **click destro** sul pad → menu con
   fondamentale, qualità (14 tipi), rivolto e ottava. La modifica è immediata e viene
   salvata nella sessione della DAW.
+- **Riempire gli 8 pad in un colpo solo**: menu **Progressione** + tonalità, sopra la riga
+  dei pad. Otto giri d'armonia pronti (pop I-V-vi-IV, doo-wop, canone, ii-V-I jazz, blues
+  di 12 battute, modale…) trasposti nella tonalità che scegli. Le progressioni più corte
+  di 8 accordi si ripetono, così tutti i pad restano utilizzabili.
 - **Cambiare accordo mentre suoni**: manda al plugin una nota MIDI nella fascia dei
   keyswitch, **C1–G1** (note MIDI 24-31, con C3 = 60): ognuna seleziona uno degli 8 slot.
   Queste note non vengono passate a valle e stanno sotto la tessitura dei profili
   strumentali, quindi non si sovrappongono a quello che suoni.
+- **Accordi da tastiera** (in alto, da attivare): invece di scegliere un pad, suona
+  l'accordo. Le note sopra la fascia dei keyswitch vengono riconosciute (triadi, settime,
+  sus, diminuite…) e l'arpeggiatore le usa finché le tieni premute; al rilascio torna
+  all'accordo selezionato sul banco. Servono almeno tre note diverse: sotto quella soglia
+  l'accordo sarebbe ambiguo e il plugin preferisce non indovinare.
 - **Quando suona**: l'arpeggiatore è sincronizzato al trasporto dell'host, quindi genera
   MIDI solo mentre la DAW sta suonando (premi Play). Per provare accordi e pattern a
   trasporto fermo attiva **Suona a trasporto fermo** in alto a destra: passa a un clock
@@ -95,6 +104,9 @@ rispetto alle build precedenti, solo core + test.
   rivolto che imposti a mano su ogni pad.
 - **Intensità del pattern**: griglia Autoplay 8×4 — colonna = accordo, riga = intensità
   (dal basso, semplice, verso l'alto, complesso). Un click seleziona entrambe insieme.
+- **Rate** (in alto a destra): moltiplicatore globale sulla velocità del pattern —
+  `1/2x`, `1x`, `Terzine`, `2x`. Lo stesso pattern suona a metà, a doppio o in terzine
+  senza doverne scrivere una variante.
 
 ## Personalizzare i pattern
 
@@ -120,12 +132,17 @@ Per ripartire da zero, cancella il file: verrà riscritto al prossimo avvio.
 | `velocityCurve` | Velocity per step, per gli accenti |
 | `strumOffsetMs` | **Chitarra**: ritardo progressivo tra le note dello stesso step — è ciò che simula la strimpellata |
 | `strumDirection` | `"up"` (grave→acuto), `"down"` (acuto→grave) o `"alternate"`: alterna a ogni step, come una strimpellata vera |
+| `palmMute` | **Chitarra**: array di `true`/`false` per step. Uno step mutato suona più corto e più piano, come col palmo appoggiato sulle corde |
+| `octaveSpread` | Numero di ottave su cui il pattern sale (o scende, se negativo) nell'arco di un ciclo |
+| `loopLength` | Quante volte `rhythmGrid` si ripete prima che il ciclo ricominci: a ogni ripetizione la sequenza ruota di un gruppo, così due battute non suonano identiche |
 | `swingAmount` | Ritarda gli step in levare (0–1) |
 | `humanizeTiming` / `humanizeVelocity` | Variazione casuale di attacco (ms) e dinamica |
-| `crescendoCurve` | **Archi**: crescendo sulla nota tenuta |
+| `crescendoCurve` | **Archi**: crescendo lungo il loop. Scala le velocity **e** invia una rampa di CC11 (expression), perché su una nota tenuta la sola velocity non basta a far gonfiare il suono |
 
 Una **pausa** si scrive con `null` al posto di un indice: lo step consuma il suo tempo
-senza suonare. È ciò che fa respirare un accompagnamento.
+senza suonare. È ciò che fa respirare un accompagnamento — ed è anche il modo di ottenere
+una **strimpellata parziale**: dentro uno step che raggruppa più note, un `null` toglie
+una corda dalla pennata.
 
 Il numero di note per step si ricava da `noteOrderSequence.size() / rhythmGrid.size()`:
 è la leva che distingue un arpeggio da un accordo pieno.

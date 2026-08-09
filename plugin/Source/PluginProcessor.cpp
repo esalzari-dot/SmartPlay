@@ -11,7 +11,8 @@ namespace
     // v1: famiglia + slot attivo + 8 accordi + griglia intensita'.
     // v2: aggiunge il flag "free run a trasporto fermo" in coda.
     // v3: aggiunge il flag "voice leading".
-    constexpr int32_t stateFormatVersion = 3;
+    // v4: aggiunge il moltiplicatore globale di velocita' dei pattern.
+    constexpr int32_t stateFormatVersion = 4;
 
     std::string embeddedPatternJson()
     {
@@ -119,6 +120,8 @@ void SmartChordAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPe
     currentLoopEvents.clear();
     currentLoopLengthBeats = 0.0;
     havePreviousSelection = false;
+    heldKeyboardNotes.clear();
+    keyboardChord.reset();
     loopClock.reset();
 }
 
@@ -127,7 +130,7 @@ void SmartChordAudioProcessor::releaseResources()
     midiOutputManager.allNotesOff();
 }
 
-void SmartChordAudioProcessor::regenerateAudioThreadLoop (double bpm)
+void SmartChordAudioProcessor::regenerateAudioThreadLoop (double bpm, const ChordDefinition& chord)
 {
     const int activeSlot = audioChordBank.getActiveSlot();
     const int intensity = audioGridState.getIntensity (audioFamily, activeSlot);
@@ -141,7 +144,6 @@ void SmartChordAudioProcessor::regenerateAudioThreadLoop (double bpm)
     }
 
     const auto profile = getVoicingProfile (audioFamily);
-    const auto& chord = audioChordBank.getActiveChord();
 
     const auto voicing = voiceLeadingEnabled.load (std::memory_order_relaxed)
         ? voiceChordWithLeading (chord, profile, previousVoicing)
@@ -149,8 +151,10 @@ void SmartChordAudioProcessor::regenerateAudioThreadLoop (double bpm)
 
     previousVoicing = voicing.notes;
 
-    currentLoopEvents = generateSequence (*pattern, voicing, SyncClock { bpm, 0.0 }, &humanizeRng);
-    currentLoopLengthBeats = patternLoopLengthBeats (*pattern);
+    const double rate = rateMultiplierFor (patternRate.load (std::memory_order_relaxed));
+
+    currentLoopEvents = generateSequence (*pattern, voicing, SyncClock { bpm, 0.0, rate }, &humanizeRng);
+    currentLoopLengthBeats = patternLoopLengthBeats (*pattern, rate);
 }
 
 void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -167,12 +171,29 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     for (const auto metadata : midiMessages)
     {
         const auto message = metadata.getMessage();
-        if (! message.isNoteOn())
-            continue;
 
-        const int slot = keyswitchSlotForNote (message.getNoteNumber());
-        if (slot >= 0)
-            keyswitchSlot = slot;
+        if (message.isNoteOn())
+        {
+            const int slot = keyswitchSlotForNote (message.getNoteNumber());
+            if (slot >= 0)
+            {
+                keyswitchSlot = slot;
+                continue;
+            }
+
+            // Sopra la fascia dei keyswitch: nota d'accordo suonata sulla tastiera.
+            heldKeyboardNotes.push_back (message.getNoteNumber());
+        }
+        else if (message.isNoteOff())
+        {
+            const auto it = std::find (heldKeyboardNotes.begin(), heldKeyboardNotes.end(), message.getNoteNumber());
+            if (it != heldKeyboardNotes.end())
+                heldKeyboardNotes.erase (it);
+        }
+        else if (message.isAllNotesOff() || message.isAllSoundOff())
+        {
+            heldKeyboardNotes.clear();
+        }
     }
 
     midiMessages.clear();
@@ -226,10 +247,24 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const int activeSlot = audioChordBank.getActiveSlot();
     const int currentIntensity = audioGridState.getIntensity (audioFamily, activeSlot);
 
+    // L'accordo suonato sulla tastiera, finche' resta premuto, prende il posto di quello
+    // selezionato sul banco: e' l'alternativa agli 8 pad per chi preferisce suonare le
+    // armonie invece di sceglierle.
+    keyboardChord.reset();
+    if (chordFromKeyboard.load (std::memory_order_relaxed) && ! heldKeyboardNotes.empty())
+        keyboardChord = recognizeChord (heldKeyboardNotes);
+
+    const ChordDefinition currentChord = keyboardChord.has_value() ? *keyboardChord
+                                                                   : audioChordBank.getActiveChord();
+
+    const auto currentRate = patternRate.load (std::memory_order_relaxed);
+
     const bool selectionChanged = ! havePreviousSelection
                                 || activeSlot != previousActiveSlot
                                 || audioFamily != previousFamily
-                                || currentIntensity != previousIntensity;
+                                || currentIntensity != previousIntensity
+                                || currentRate != previousRate
+                                || currentChord != previousChord;
 
     const bool freeRun = freeRunWhenStopped.load (std::memory_order_relaxed);
 
@@ -239,7 +274,7 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         for (const auto& off : midiOutputManager.allNotesOff())
             midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
 
-        regenerateAudioThreadLoop (bpm);
+        regenerateAudioThreadLoop (bpm, currentChord);
 
         // Fa ripartire il pattern dall'inizio, indipendentemente dalla posizione
         // assoluta dell'host: risponde subito al cambio, invece di "entrare" a meta'.
@@ -248,6 +283,8 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         previousActiveSlot = activeSlot;
         previousFamily = audioFamily;
         previousIntensity = currentIntensity;
+        previousRate = currentRate;
+        previousChord = currentChord;
         havePreviousSelection = true;
     }
 
@@ -274,6 +311,13 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
     for (const auto& s : scheduled)
     {
+        if (s.event.kind == NoteEvent::Kind::ControlChange)
+        {
+            midiMessages.addEvent (juce::MidiMessage::controllerEvent (1, s.event.midiNote, s.event.velocity),
+                                    s.sampleOffset);
+            continue;
+        }
+
         if (s.event.kind == NoteEvent::Kind::NoteOn)
         {
             midiMessages.addEvent (juce::MidiMessage::noteOn (1, s.event.midiNote, static_cast<juce::uint8> (s.event.velocity)),
@@ -369,6 +413,8 @@ void SmartChordAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 
     stream.writeBool (freeRunWhenStopped.load (std::memory_order_relaxed));
     stream.writeBool (voiceLeadingEnabled.load (std::memory_order_relaxed));
+    stream.writeInt (static_cast<int> (patternRate.load (std::memory_order_relaxed)));
+    stream.writeBool (chordFromKeyboard.load (std::memory_order_relaxed));
 }
 
 void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -408,6 +454,15 @@ void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeIn
 
     if (version >= 3)
         voiceLeadingEnabled.store (stream.readBool(), std::memory_order_relaxed);
+
+    if (version >= 4)
+    {
+        const int storedRate = stream.readInt();
+        if (storedRate >= static_cast<int> (PatternRate::Half) && storedRate <= static_cast<int> (PatternRate::Double))
+            patternRate.store (static_cast<PatternRate> (storedRate), std::memory_order_relaxed);
+
+        chordFromKeyboard.store (stream.readBool(), std::memory_order_relaxed);
+    }
 }
 
 } // namespace smartchord

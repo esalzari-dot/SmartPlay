@@ -83,6 +83,8 @@
     },
     {
       "id": "piano_broken_chord_classic",
+      "loopLength": 2,
+            "octaveSpread": 1,
       "displayName": "Broken Chord Classic",
       "instrumentFamily": "Piano",
       "intensityLevel": 3,
@@ -248,6 +250,7 @@
     },
     {
       "id": "guitar_up_down_picking",
+      "palmMute": [false, true, false, true, false, true],
       "displayName": "Up · Down Picking",
       "instrumentFamily": "Guitar",
       "intensityLevel": 2,
@@ -287,6 +290,7 @@
     },
     {
       "id": "guitar_travis_picking",
+      "loopLength": 2,
       "displayName": "Travis Picking",
       "instrumentFamily": "Guitar",
       "intensityLevel": 3,
@@ -408,6 +412,7 @@
     },
     {
       "id": "strings_tremolo_pizzicato",
+      "octaveSpread": 1,
       "displayName": "Tremolo Pizzicato",
       "instrumentFamily": "Strings",
       "intensityLevel": 3,
