@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Smart Chord & Arpeggiator — Studio Panel Mockup</title>
+<style>
+  :root{
+    --ink:#17161B;
+    --panel:#211F26;
+    --panel-raised:#2B2831;
+    --panel-raised-hi:#332F39;
+    --panel-inset:#19171D;
+    --seam:#0C0B10;
+    --text:#EDE9E2;
+    --text-muted:#938F9B;
+    --text-dim:#635F6B;
+
+    --piano:#5AA9E6;      --piano-dim:#2E5C82;
+    --bass:#F0794A;       --bass-dim:#8A3F24;
+    --guitar:#4FCC9C;     --guitar-dim:#276B4E;
+    --strings:#A78BFA;    --strings-dim:#5B4A96;
+
+    --accent: var(--guitar);
+    --accent-dim: var(--guitar-dim);
+
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #26232c 0%, transparent 60%),
+      var(--ink);
+    font-family:var(--sans);
+    color:var(--text);
+    padding:48px 20px;
+  }
+
+  .plugin{
+    width:880px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.1) 40%),
+      var(--panel);
+    border-radius:14px;
+    border:1px solid var(--seam);
+    box-shadow:
+      0 40px 90px -20px rgba(0,0,0,0.7),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+    overflow:hidden;
+    position:relative;
+  }
+  /* faint fascia grain, so the panel reads as a material, not a flat fill */
+  .plugin::before{
+    content:'';
+    position:absolute; inset:0; pointer-events:none;
+    opacity:.5;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+  }
+
+  /* ===== NAMEPLATE / HEADER ===== */
+  .nameplate{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 24px;
+    background:var(--seam);
+    border-bottom:1px solid rgba(255,255,255,0.04);
+    position:relative;
+  }
+  .brand{
+    font-family:var(--mono);
+    font-weight:700;
+    letter-spacing:2.5px;
+    font-size:13px;
+    text-transform:uppercase;
+    color:var(--text);
+    display:flex; align-items:baseline; gap:8px;
+  }
+  .brand .amp{color:var(--accent); transition:color .3s;}
+  .brand .sub{
+    font-family:var(--sans); font-weight:400; letter-spacing:0;
+    font-size:11px; color:var(--text-dim); text-transform:none;
+  }
+  .nameplate-controls{
+    display:flex; align-items:center; gap:18px;
+  }
+  .mini-toggle{
+    display:flex; align-items:center; gap:6px;
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.4px;
+    color:var(--text-dim); cursor:pointer; user-select:none;
+    transition:color .15s;
+  }
+  .mini-toggle:hover{color:var(--text-muted);}
+  .mini-toggle .box{
+    width:11px;height:11px;border-radius:3px;
+    border:1px solid rgba(255,255,255,0.18);
+    background:var(--panel-inset);
+    position:relative;
+    transition:all .15s;
+  }
+  .mini-toggle.on .box{
+    background:var(--accent); border-color:var(--accent);
+    box-shadow:0 0 8px -1px var(--accent);
+  }
+  .mini-toggle.on .box::after{
+    content:'';
+    position:absolute; left:3px; top:1px;
+    width:3px;height:6px;
+    border:solid var(--ink); border-width:0 1.5px 1.5px 0;
+    transform:rotate(40deg);
+  }
+  .mini-toggle.on{color:var(--text);}
+  .rate-pill{
+    font-family:var(--mono); font-size:11px;
+    background:var(--panel-inset);
+    border:1px solid rgba(255,255,255,0.08);
+    color:var(--text-muted);
+    padding:5px 10px; border-radius:6px;
+    display:flex; align-items:center; gap:6px;
+    cursor:pointer;
+  }
+  .rate-pill .val{color:var(--text); font-weight:600;}
+  .rate-pill::after{content:'▾'; font-size:8px; color:var(--text-dim);}
+
+  /* ===== SECTION LABEL (hardware panel language) ===== */
+  .section{padding:18px 24px 0 24px;}
+  .section-label{
+    font-family:var(--mono);
+    font-size:10px; font-weight:600;
+    letter-spacing:1.8px; text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:10px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .section-label::after{
+    content:''; flex:1; height:1px;
+    background:linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+  }
+
+  /* ===== FAMILY SWITCHER ===== */
+  .segmented{
+    display:grid; grid-template-columns:repeat(4,1fr);
+    background:var(--panel-inset);
+    border:1px solid rgba(255,255,255,0.05);
+    border-radius:10px; padding:4px; gap:4px;
+  }
+  .segment{
+    text-align:center; padding:10px 0;
+    border-radius:7px;
+    font-family:var(--mono);
+    font-size:11.5px; font-weight:600; letter-spacing:.8px; text-transform:uppercase;
+    color:var(--text-dim);
+    cursor:pointer;
+    transition:all .15s;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+  }
+  .segment .dot{width:6px;height:6px;border-radius:50%; background:currentColor; opacity:.5;}
+  .segment[data-fam="piano"]{ }
+  .segment.selected{
+    background:linear-gradient(180deg, var(--panel-raised-hi), var(--panel-raised));
+    color:var(--text);
+    box-shadow:0 1px 0 rgba(255,255,255,0.06) inset, 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .segment.selected .dot{background:var(--accent); opacity:1; box-shadow:0 0 6px var(--accent);}
+
+  /* ===== BANK ROW: progression / key / preset ===== */
+  .bank-row{
+    display:flex; align-items:flex-end; gap:22px; flex-wrap:wrap;
+  }
+  .field{display:flex; flex-direction:column; gap:6px;}
+  .field-label{
+    font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--text-dim);
+  }
+  .field select, .dropdown{
+    font-family:var(--sans); font-size:12.5px;
+    background:var(--panel-inset);
+    border:1px solid rgba(255,255,255,0.08);
+    color:var(--text);
+    padding:8px 11px; border-radius:7px;
+    min-width:150px;
+  }
+  .dropdown.narrow{min-width:70px;}
+  .btn{
+    font-family:var(--sans); font-size:12px; font-weight:600;
+    padding:8px 14px; border-radius:7px;
+    border:1px solid rgba(255,255,255,0.08);
+    background:var(--panel-raised);
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:all .15s;
+  }
+  .btn:hover{color:var(--text); border-color:rgba(255,255,255,0.16);}
+  .btn.danger:hover{color:var(--bass); border-color:var(--bass-dim);}
+  .bank-actions{display:flex; gap:8px;}
+
+  /* ===== PERFORMANCE ROW: swing/gate/octave + mode toggles ===== */
+  .perf-row{
+    display:flex; align-items:center; gap:28px; flex-wrap:wrap;
+  }
+  .knob-block{display:flex; align-items:center; gap:10px;}
+  .knob{
+    width:38px;height:38px; border-radius:50%;
+    background:radial-gradient(circle at 32% 28%, var(--panel-raised-hi), var(--panel-inset) 72%);
+    border:1px solid rgba(255,255,255,0.08);
+    box-shadow:0 2px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+    position:relative; flex-shrink:0;
+  }
+  .knob::after{
+    content:'';
+    position:absolute; top:4px; left:50%;
+    width:2px;height:12px;
+    background:var(--accent);
+    transform-origin:bottom center;
+    border-radius:2px;
+    transition:transform .2s, background .3s;
+  }
+  .knob-text{display:flex; flex-direction:column; gap:1px;}
+  .knob-label{font-family:var(--mono); font-size:9.5px; letter-spacing:1px; text-transform:uppercase; color:var(--text-dim);}
+  .knob-value{font-family:var(--mono); font-size:13px; color:var(--text); font-variant-numeric:tabular-nums;}
+
+  .toggle-cluster{display:flex; gap:16px; margin-left:auto;}
+
+  /* ===== CHORD BANK — 9 keycap pads ===== */
+  .pad-grid{
+    display:grid; grid-template-columns:repeat(9,1fr);
+    gap:8px;
+  }
+  .pad{
+    aspect-ratio:0.92/1;
+    background:linear-gradient(180deg, var(--panel-raised-hi), var(--panel-raised));
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.05);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 3px 7px rgba(0,0,0,0.35);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; position:relative;
+    transition:transform .12s, box-shadow .12s;
+  }
+  .pad:hover{transform:translateY(-1px);}
+  .pad .slot-num{
+    position:absolute; top:5px; left:7px;
+    font-family:var(--mono); font-size:8.5px; color:rgba(237,233,226,0.22);
+  }
+  .pad .r{font-family:var(--sans); font-size:16px; font-weight:700; color:var(--text);}
+  .pad .q{font-family:var(--mono); font-size:9px; color:var(--text-dim); margin-top:2px; letter-spacing:.4px;}
+  .pad.active{
+    background:linear-gradient(180deg, var(--accent), var(--accent-dim));
+    border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent), 0 0 22px -4px var(--accent), inset 0 1px 0 rgba(255,255,255,0.35);
+  }
+  .pad.active .r{color:var(--ink);}
+  .pad.active .q{color:rgba(23,22,27,0.6);}
+  .pad.active .slot-num{color:rgba(23,22,27,0.35);}
+
+  /* ===== AUTOPLAY GRID — LED matrix ===== */
+  .autoplay-wrap{
+    background:var(--panel-inset);
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.04);
+    box-shadow:inset 0 2px 8px rgba(0,0,0,0.4);
+    padding:9px;
+  }
+  .autoplay-grid{
+    display:grid;
+    grid-template-columns:repeat(9,1fr);
+    grid-template-rows:repeat(4,1fr);
+    gap:4px;
+    height:150px;
+  }
+  .cell{
+    border-radius:3px;
+    background:rgba(255,255,255,0.03);
+    cursor:pointer;
+    transition:background .1s;
+  }
+  .cell:hover{background:rgba(255,255,255,0.07);}
+  .cell.active-col{background:rgba(255,255,255,0.05);}
+  .cell.selected{
+    background:var(--accent);
+    box-shadow:0 0 8px -1px var(--accent);
+  }
+  .intensity-caption{
+    display:flex; justify-content:space-between;
+    margin-top:8px;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.5px; text-transform:uppercase;
+    color:var(--text-dim);
+  }
+
+  /* ===== READOUT FOOTER ===== */
+  .footer{
+    margin:20px 24px 0 24px;
+    background:var(--seam);
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.04);
+    overflow:hidden;
+  }
+  .footer-main{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:13px 16px;
+  }
+  .footer .name{font-family:var(--sans); font-weight:700; font-size:14px; color:var(--text);}
+  .footer .sub{font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:3px; letter-spacing:.3px;}
+  .footer .route{
+    font-family:var(--mono); font-size:10.5px; font-weight:600;
+    color:var(--accent);
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.06);
+    padding:6px 11px; border-radius:999px;
+    white-space:nowrap;
+  }
+  .playhead-track{
+    height:3px; background:rgba(255,255,255,0.05);
+    position:relative;
+  }
+  .playhead-fill{
+    height:100%; width:38%;
+    background:linear-gradient(90deg, var(--accent-dim), var(--accent));
+    box-shadow:0 0 10px 0 var(--accent);
+    transition:width .1s linear;
+  }
+
+  .bottom-space{height:22px;}
+</style>
+</head>
+<body>
+
+<div class="plugin">
+
+  <div class="nameplate">
+    <div class="brand">SMART CHORD <span class="amp">&amp;</span> ARPEGGIATOR<span class="sub">v0.5</span></div>
+    <div class="nameplate-controls">
+      <div class="mini-toggle" id="tKeyboard"><span class="box"></span>Accordi da tastiera</div>
+      <div class="mini-toggle on" id="tVoiceLeading"><span class="box"></span>Voice leading</div>
+      <div class="mini-toggle" id="tFreeRun"><span class="box"></span>Trasporto fermo</div>
+      <div class="rate-pill" id="ratePill"><span>Rate</span><span class="val">1x</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Instrument</div>
+    <div class="segmented" id="segmented"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Bank</div>
+    <div class="bank-row">
+      <div class="field">
+        <div class="field-label">Progressione</div>
+        <select class="dropdown"><option>—</option><option>Pop I·V·vi·IV</option><option>Doo-wop</option><option>Jazz ii·V·I</option></select>
+      </div>
+      <div class="field">
+        <div class="field-label">Tonalità</div>
+        <select class="dropdown narrow"><option>C</option></select>
+      </div>
+      <div class="field">
+        <div class="field-label">Preset</div>
+        <select class="dropdown" id="presetSelect"><option>Verse</option><option>Chorus</option></select>
+      </div>
+      <div class="bank-actions">
+        <div class="btn">Salva…</div>
+        <div class="btn danger">Elimina</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Performance</div>
+    <div class="perf-row">
+      <div class="knob-block">
+        <div class="knob" style="--rot:-35deg"></div>
+        <div class="knob-text"><div class="knob-label">Swing</div><div class="knob-value">12%</div></div>
+      </div>
+      <div class="knob-block">
+        <div class="knob" style="--rot:20deg"></div>
+        <div class="knob-text"><div class="knob-label">Gate</div><div class="knob-value">92%</div></div>
+      </div>
+      <div class="knob-block">
+        <div class="knob" style="--rot:0deg"></div>
+        <div class="knob-text"><div class="knob-label">Ottava</div><div class="knob-value">+0</div></div>
+      </div>
+      <div class="toggle-cluster">
+        <div class="mini-toggle" id="tQuantize"><span class="box"></span>Switch a tempo</div>
+        <div class="mini-toggle on" id="tHumanize"><span class="box"></span>Humanize</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Chord Bank</div>
+    <div class="pad-grid" id="padGrid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Autoplay</div>
+    <div class="autoplay-wrap">
+      <div class="autoplay-grid" id="autoplayGrid"></div>
+    </div>
+    <div class="intensity-caption"><span>Semplice</span><span>Complesso</span></div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-main">
+      <div>
+        <div class="name" id="patternName">Strumming Simulato</div>
+        <div class="sub" id="patternSub">GUITAR · INT 2/4 · G7</div>
+      </div>
+      <div class="route" id="routeLabel">→ VST GUITAR</div>
+    </div>
+    <div class="playhead-track"><div class="playhead-fill" id="playheadFill"></div></div>
+  </div>
+
+  <div class="bottom-space"></div>
+</div>
+
+<script>
+const chords = [
+  {root:'C', q:'maj'}, {root:'G', q:'maj'}, {root:'A', q:'min'}, {root:'F', q:'maj'},
+  {root:'D', q:'min7'}, {root:'E', q:'min'}, {root:'B', q:'dim'}, {root:'C', q:'7'}, {root:'G', q:'7'}
+];
+
+const families = [
+  {id:'piano', label:'Piano'},
+  {id:'bass', label:'Bass'},
+  {id:'guitar', label:'Guitar'},
+  {id:'strings', label:'Strings'}
+];
+
+const intensityPatterns = {
+  piano:   ['As Played', 'Up · Down', 'Alberti Bass', 'Broken Chord Classic'],
+  bass:    ['Root Sostenuto', 'Root-Fifth Alternato', 'Walking Pop', 'Walking Sincopato'],
+  guitar:  ['Pad Sostenuto', 'Strumming Simulato', 'Up · Down Picking', 'Travis Picking'],
+  strings: ['Sostenuto Legato', 'Legato Mosso', 'Tremolo Leggero', 'Tremolo Pizzicato']
+};
+
+const instrumentNames = { piano:'VST PIANO', bass:'VST BASS', guitar:'VST GUITAR', strings:'VST STRINGS' };
+
+let activeFamily = 'guitar';
+let activeChord = 8; // G7, matches footer default
+let intensityByChord = {};
+families.forEach(f=>{ intensityByChord[f.id] = new Array(9).fill(1); });
+
+const segmented = document.getElementById('segmented');
+const padGrid = document.getElementById('padGrid');
+const autoplayGrid = document.getElementById('autoplayGrid');
+const patternName = document.getElementById('patternName');
+const patternSub = document.getElementById('patternSub');
+const routeLabel = document.getElementById('routeLabel');
+const root = document.documentElement;
+
+function applyAccent(){
+  const map = {
+    piano:['--piano','--piano-dim'], bass:['--bass','--bass-dim'],
+    guitar:['--guitar','--guitar-dim'], strings:['--strings','--strings-dim']
+  };
+  const [c, cd] = map[activeFamily];
+  root.style.setProperty('--accent', `var(${c})`);
+  root.style.setProperty('--accent-dim', `var(${cd})`);
+}
+
+function renderSegmented(){
+  segmented.innerHTML = '';
+  families.forEach(f=>{
+    const seg = document.createElement('div');
+    seg.className = 'segment' + (f.id===activeFamily ? ' selected':'');
+    seg.setAttribute('data-fam', f.id);
+    seg.innerHTML = `<span class="dot"></span>${f.label}`;
+    seg.onclick = ()=>{ activeFamily = f.id; applyAccent(); renderAll(); };
+    segmented.appendChild(seg);
+  });
+}
+
+function renderPadGrid(){
+  padGrid.innerHTML = '';
+  chords.forEach((c,i)=>{
+    const pad = document.createElement('div');
+    pad.className = 'pad' + (i===activeChord ? ' active':'');
+    pad.innerHTML = `<span class="slot-num">${i+1}</span><span class="r">${c.root}</span><span class="q">${c.q}</span>`;
+    pad.onclick = ()=>{ activeChord = i; renderAll(); };
+    padGrid.appendChild(pad);
+  });
+}
+
+function renderAutoplayGrid(){
+  autoplayGrid.innerHTML = '';
+  for(let rowVisual=0; rowVisual<4; rowVisual++){
+    const intensity = 3 - rowVisual;
+    for(let col=0; col<9; col++){
+      const cell = document.createElement('div');
+      const isActiveCol = col === activeChord;
+      const isSelected = isActiveCol && intensityByChord[activeFamily][col] === intensity;
+      cell.className = 'cell' + (isActiveCol ? ' active-col':'') + (isSelected ? ' selected':'');
+      cell.onclick = ()=>{
+        activeChord = col;
+        intensityByChord[activeFamily][col] = intensity;
+        renderAll();
+      };
+      autoplayGrid.appendChild(cell);
+    }
+  }
+}
+
+function renderReadout(){
+  const level = intensityByChord[activeFamily][activeChord];
+  const name = intensityPatterns[activeFamily][level];
+  patternName.textContent = name;
+  patternSub.textContent = `${families.find(f=>f.id===activeFamily).label.toUpperCase()} · INT ${level+1}/4 · ${chords[activeChord].root}${chords[activeChord].q}`;
+  routeLabel.textContent = `→ ${instrumentNames[activeFamily]}`;
+}
+
+function renderAll(){
+  renderSegmented();
+  renderPadGrid();
+  renderAutoplayGrid();
+  renderReadout();
+}
+
+// finti toggle cliccabili, solo per la demo del mockup
+['tKeyboard','tVoiceLeading','tFreeRun','tQuantize','tHumanize'].forEach(id=>{
+  document.getElementById(id).onclick = function(){ this.classList.toggle('on'); };
+});
+
+// playhead animato, solo per mostrare come si muove
+let playPos = 0;
+setInterval(()=>{
+  playPos = (playPos + 1) % 100;
+  document.getElementById('playheadFill').style.width = playPos + '%';
+}, 60);
+
+applyAccent();
+renderAll();
+</script>
+
+</body>
+</html>
