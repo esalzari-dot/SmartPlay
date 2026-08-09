@@ -27,27 +27,42 @@ namespace
 void ChordPadRow::ChordPad::paintButton (juce::Graphics& g, bool isMouseOverButton, bool /*isButtonDown*/)
 {
     auto bounds = getLocalBounds().toFloat();
+    constexpr float corner = 8.0f;
 
-    g.setColour (selected ? accent : Palette::panel);
-    g.fillRoundedRectangle (bounds, 12.0f);
-
+    // Tasto in rilievo (gradiente verticale chiaro->scuro) o pieno d'accento quando
+    // selezionato: la stessa lettura "keycap" del mockup, senza bisogno di un'ombra vera.
     if (selected)
     {
-        g.setColour (accentDark);
-        g.drawRoundedRectangle (bounds.reduced (1.0f), 12.0f, 2.0f);
+        juce::ColourGradient gradient (accent, bounds.getX(), bounds.getY(),
+                                        accentDark, bounds.getX(), bounds.getBottom(), false);
+        g.setGradientFill (gradient);
+        g.fillRoundedRectangle (bounds, corner);
+
+        g.setColour (accent.withAlpha (0.55f));
+        g.drawRoundedRectangle (bounds.reduced (1.0f), corner, 2.0f);
     }
-    else if (isMouseOverButton)
+    else
     {
-        g.setColour (Palette::panelEdge);
-        g.drawRoundedRectangle (bounds.reduced (1.0f), 12.0f, 1.0f);
+        juce::ColourGradient gradient (isMouseOverButton ? Palette::panelRaisedHi : Palette::panelRaised,
+                                        bounds.getX(), bounds.getY(),
+                                        Palette::panelRaised.darker (0.15f), bounds.getX(), bounds.getBottom(), false);
+        g.setGradientFill (gradient);
+        g.fillRoundedRectangle (bounds, corner);
     }
 
-    g.setColour (selected ? juce::Colours::white : Palette::text);
-    g.setFont (juce::FontOptions (17.0f, juce::Font::bold));
+    // Numero di slot, come le etichette dei tasti su un controller hardware: un
+    // riferimento silenzioso a quale tasto del tastierino numerico lo richiama.
+    g.setColour ((selected ? Palette::ink : Palette::text).withAlpha (0.28f));
+    g.setFont (monoFont (8.5f));
+    g.drawText (juce::String (slotIndex + 1), bounds.reduced (7.0f, 5.0f).removeFromTop (10.0f),
+                juce::Justification::topLeft);
+
+    g.setColour (selected ? Palette::ink : Palette::text);
+    g.setFont (juce::FontOptions (16.0f, juce::Font::bold));
     g.drawText (rootLabel, bounds.removeFromTop (bounds.getHeight() * 0.6f), juce::Justification::centred);
 
-    g.setColour (selected ? juce::Colours::white : Palette::textMuted);
-    g.setFont (juce::FontOptions (10.0f));
+    g.setColour (selected ? Palette::ink.withAlpha (0.6f) : Palette::textDim);
+    g.setFont (monoFont (9.0f));
     g.drawText (qualityLabel, bounds, juce::Justification::centred);
 }
 
@@ -148,6 +163,7 @@ void ChordPadRow::refreshFrom (const ChordBankModule& bank, juce::Colour accentC
         pad.chord = chord;
         pad.rootLabel = noteNameFor (chord.rootSemitone);
         pad.qualityLabel = qualityAbbreviationFor (chord.quality);
+        pad.slotIndex = i;
         pad.selected = (i == bank.getActiveSlot());
         pad.accent = accentColour;
         pad.accentDark = accentDarkColour;

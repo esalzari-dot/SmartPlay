@@ -15,14 +15,31 @@ namespace
     constexpr int progressionIdBase = 1;
     constexpr int keyIdBase = 1;
 
-    // I ComboBox di JUCE nascono scuri: senza questo riallineamento stonerebbero sul
-    // pannello chiaro del resto della UI.
     void styleComboBox (juce::ComboBox& box)
     {
-        box.setColour (juce::ComboBox::backgroundColourId, Palette::panel);
+        box.setColour (juce::ComboBox::backgroundColourId, Palette::panelRaised);
         box.setColour (juce::ComboBox::textColourId, Palette::text);
-        box.setColour (juce::ComboBox::outlineColourId, Palette::panelEdge);
-        box.setColour (juce::ComboBox::arrowColourId, Palette::textMuted);
+        box.setColour (juce::ComboBox::outlineColourId, Palette::seam);
+        box.setColour (juce::ComboBox::arrowColourId, Palette::textDim);
+    }
+
+    void styleToggle (juce::ToggleButton& toggle)
+    {
+        toggle.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+        toggle.setColour (juce::ToggleButton::tickColourId, Palette::text);
+        toggle.setColour (juce::ToggleButton::tickDisabledColourId, Palette::textDim);
+    }
+
+    // Etichetta "eyebrow" in stile pannello hardware: mono, tracciata, minuscola nel
+    // peso visivo ma maiuscola nel testo - la stessa lettura di un'etichetta serigrafata
+    // accanto a una sezione di manopole.
+    void styleSectionLabel (juce::Label& label, const juce::String& text)
+    {
+        label.setText (text.toUpperCase(), juce::dontSendNotification);
+        auto font = monoFont (10.0f, juce::Font::bold);
+        font.setExtraKerningFactor (0.12f);
+        label.setFont (font);
+        label.setColour (juce::Label::textColourId, Palette::textDim);
     }
 }
 
@@ -34,9 +51,16 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
       activeFamily (initialFamily)
 {
     titleLabel.setText ("Smart Chord & Arpeggiator", juce::dontSendNotification);
-    titleLabel.setFont (juce::FontOptions (15.0f, juce::Font::bold));
+    {
+        auto titleFont = monoFont (13.0f, juce::Font::bold);
+        titleFont.setExtraKerningFactor (0.06f);
+        titleLabel.setFont (titleFont);
+    }
     titleLabel.setColour (juce::Label::textColourId, Palette::text);
     addAndMakeVisible (titleLabel);
+
+    styleSectionLabel (instrumentSectionLabel, "Instrument");
+    addAndMakeVisible (instrumentSectionLabel);
 
     addAndMakeVisible (familySwitcher);
     familySwitcher.setSelectedFamily (activeFamily);
@@ -45,6 +69,9 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
         activeFamily = family;
         refresh();
     };
+
+    styleSectionLabel (chordBankSectionLabel, "Chord Bank");
+    addAndMakeVisible (chordBankSectionLabel);
 
     addAndMakeVisible (chordPadRow);
     chordPadRow.onChordSelected = [this] (int slot)
@@ -59,6 +86,9 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
         refresh();
     };
 
+    styleSectionLabel (autoplaySectionLabel, "Autoplay");
+    addAndMakeVisible (autoplaySectionLabel);
+
     addAndMakeVisible (autoplayGrid);
     autoplayGrid.onCellSelected = [this] (int chordSlot, int intensityLevel)
     {
@@ -67,10 +97,20 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
         refresh();
     };
 
+    for (auto* caption : { &simpleCaptionLabel, &complexCaptionLabel })
+    {
+        caption->setFont (monoFont (9.0f));
+        caption->setColour (juce::Label::textColourId, Palette::textDim);
+    }
+    simpleCaptionLabel.setText ("SEMPLICE", juce::dontSendNotification);
+    complexCaptionLabel.setText ("COMPLESSO", juce::dontSendNotification);
+    complexCaptionLabel.setJustificationType (juce::Justification::right);
+    addAndMakeVisible (simpleCaptionLabel);
+    addAndMakeVisible (complexCaptionLabel);
+
     addAndMakeVisible (patternReadout);
 
-    freeRunButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
-    freeRunButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    styleToggle (freeRunButton);
     freeRunButton.setVisible (false);
     freeRunButton.onClick = [this]
     {
@@ -79,8 +119,7 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (freeRunButton);
 
-    voiceLeadingButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
-    voiceLeadingButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    styleToggle (voiceLeadingButton);
     voiceLeadingButton.setVisible (false);
     voiceLeadingButton.onClick = [this]
     {
@@ -90,8 +129,8 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     addChildComponent (voiceLeadingButton);
 
     rateLabel.setText ("Rate", juce::dontSendNotification);
-    rateLabel.setFont (juce::FontOptions (12.0f));
-    rateLabel.setColour (juce::Label::textColourId, Palette::textMuted);
+    rateLabel.setFont (monoFont (11.0f));
+    rateLabel.setColour (juce::Label::textColourId, Palette::textDim);
     rateLabel.setJustificationType (juce::Justification::centredRight);
     rateLabel.setVisible (false);
     addChildComponent (rateLabel);
@@ -110,8 +149,7 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (rateBox);
 
-    chordFromKeyboardButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
-    chordFromKeyboardButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    styleToggle (chordFromKeyboardButton);
     chordFromKeyboardButton.setVisible (false);
     chordFromKeyboardButton.onClick = [this]
     {
@@ -120,9 +158,12 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (chordFromKeyboardButton);
 
+    styleSectionLabel (bankSectionLabel, "Bank");
+    addAndMakeVisible (bankSectionLabel);
+
     progressionLabel.setText ("Progressione", juce::dontSendNotification);
-    progressionLabel.setFont (juce::FontOptions (12.0f));
-    progressionLabel.setColour (juce::Label::textColourId, Palette::textMuted);
+    progressionLabel.setFont (monoFont (11.0f));
+    progressionLabel.setColour (juce::Label::textColourId, Palette::textDim);
     addAndMakeVisible (progressionLabel);
 
     progressionBox.addItem ("-", progressionIdBase);
@@ -143,8 +184,8 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     keyBox.onChange = [this] { applySelectedProgression(); };
     addAndMakeVisible (keyBox);
 
-    presetLabel.setFont (juce::FontOptions (12.0f));
-    presetLabel.setColour (juce::Label::textColourId, Palette::textMuted);
+    presetLabel.setFont (monoFont (11.0f));
+    presetLabel.setColour (juce::Label::textColourId, Palette::textDim);
     addAndMakeVisible (presetLabel);
 
     styleComboBox (presetBox);
@@ -158,6 +199,8 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addAndMakeVisible (presetBox);
 
+    savePresetButton.setColour (juce::TextButton::buttonColourId, Palette::panelRaised);
+    savePresetButton.setColour (juce::TextButton::textColourOffId, Palette::textMuted);
     savePresetButton.onClick = [this]
     {
         // deleteWhenDismissed=true: la AlertWindow si distrugge da sola alla chiusura,
@@ -178,6 +221,8 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addAndMakeVisible (savePresetButton);
 
+    deletePresetButton.setColour (juce::TextButton::buttonColourId, Palette::panelRaised);
+    deletePresetButton.setColour (juce::TextButton::textColourOffId, Palette::textMuted);
     deletePresetButton.onClick = [this]
     {
         const auto name = presetBox.getText();
@@ -186,21 +231,34 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addAndMakeVisible (deletePresetButton);
 
+    styleSectionLabel (performanceSectionLabel, "Performance");
+    performanceSectionLabel.setVisible (false);
+    addChildComponent (performanceSectionLabel);
+
     // Swing/gate/ottava globali (SPEC.md sezione 8): automatizzabili solo dentro il
     // plugin, quindi nascosti di default come rate/freeRun/voiceLeading/keyboard.
     for (auto* label : { &swingLabel, &gateLabel, &octaveLabel })
     {
-        label->setFont (juce::FontOptions (12.0f));
-        label->setColour (juce::Label::textColourId, Palette::textMuted);
+        label->setFont (monoFont (11.0f));
+        label->setColour (juce::Label::textColourId, Palette::textDim);
         label->setJustificationType (juce::Justification::centredRight);
         label->setVisible (false);
         addChildComponent (label);
     }
 
+    auto styleSlider = [] (juce::Slider& slider)
+    {
+        slider.setColour (juce::Slider::backgroundColourId, Palette::panelInset);
+        slider.setColour (juce::Slider::trackColourId, Palette::panelRaisedHi);
+        slider.setColour (juce::Slider::thumbColourId, Palette::text);
+        slider.setColour (juce::Slider::textBoxTextColourId, Palette::text);
+        slider.setColour (juce::Slider::textBoxBackgroundColourId, Palette::panelInset);
+        slider.setColour (juce::Slider::textBoxOutlineColourId, Palette::seam);
+    };
+
     swingSlider.setRange (0.0, 1.0);
     swingSlider.setTextValueSuffix ("%");
-    swingSlider.setColour (juce::Slider::textBoxTextColourId, Palette::text);
-    swingSlider.setColour (juce::Slider::textBoxOutlineColourId, Palette::panelEdge);
+    styleSlider (swingSlider);
     swingSlider.textFromValueFunction = [] (double value) { return juce::String (juce::roundToInt (value * 100.0)); };
     swingSlider.valueFromTextFunction = [] (const juce::String& text) { return text.getDoubleValue() / 100.0; };
     swingSlider.setValue (0.0, juce::dontSendNotification);
@@ -215,8 +273,7 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
 
     gateSlider.setRange (0.25, 1.5);
     gateSlider.setTextValueSuffix ("%");
-    gateSlider.setColour (juce::Slider::textBoxTextColourId, Palette::text);
-    gateSlider.setColour (juce::Slider::textBoxOutlineColourId, Palette::panelEdge);
+    styleSlider (gateSlider);
     gateSlider.textFromValueFunction = [] (double value) { return juce::String (juce::roundToInt (value * 100.0)); };
     gateSlider.valueFromTextFunction = [] (const juce::String& text) { return text.getDoubleValue() / 100.0; };
     gateSlider.setValue (1.0, juce::dontSendNotification);
@@ -241,8 +298,7 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (octaveBox);
 
-    quantizeSwitchButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
-    quantizeSwitchButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    styleToggle (quantizeSwitchButton);
     quantizeSwitchButton.setVisible (false);
     quantizeSwitchButton.onClick = [this]
     {
@@ -251,8 +307,7 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (quantizeSwitchButton);
 
-    humanizeButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
-    humanizeButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    styleToggle (humanizeButton);
     humanizeButton.setToggleState (true, juce::dontSendNotification);
     humanizeButton.setVisible (false);
     humanizeButton.onClick = [this]
@@ -262,7 +317,7 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (humanizeButton);
 
-    setSize (820, 590);
+    setSize (820, 706);
     refresh();
 }
 
@@ -278,6 +333,7 @@ void AutoplayGridPanel::setFreeRunControlVisible (bool shouldBeVisible)
 
 void AutoplayGridPanel::setGlobalControlsVisible (bool shouldBeVisible)
 {
+    performanceSectionLabel.setVisible (shouldBeVisible);
     swingLabel.setVisible (shouldBeVisible);
     swingSlider.setVisible (shouldBeVisible);
     gateLabel.setVisible (shouldBeVisible);
@@ -405,7 +461,14 @@ void AutoplayGridPanel::refresh()
 
 void AutoplayGridPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (Palette::background);
+    g.fillAll (Palette::panel);
+
+    // Leggera grana verticale sul corpo del pannello, la stessa idea di
+    // docs/mockup-v3-studio-panel.html: fa leggere il fondo come un materiale invece
+    // che come un riempimento piatto, senza il costo di una texture vera.
+    g.setColour (Palette::seam.withAlpha (0.25f));
+    for (int y = 0; y < getHeight(); y += 3)
+        g.drawHorizontalLine (y, 0.0f, static_cast<float> (getWidth()));
 }
 
 void AutoplayGridPanel::resized()
@@ -421,9 +484,13 @@ void AutoplayGridPanel::resized()
     titleLabel.setBounds (topBar);
 
     bounds.removeFromTop (16);
+    instrumentSectionLabel.setBounds (bounds.removeFromTop (16).reduced (20, 0));
+    bounds.removeFromTop (6);
     familySwitcher.setBounds (bounds.removeFromTop (44).reduced (20, 0));
 
-    bounds.removeFromTop (12);
+    bounds.removeFromTop (14);
+    bankSectionLabel.setBounds (bounds.removeFromTop (16).reduced (20, 0));
+    bounds.removeFromTop (6);
     auto progressionBar = bounds.removeFromTop (26).reduced (20, 0);
     progressionLabel.setBounds (progressionBar.removeFromLeft (86));
     progressionBox.setBounds (progressionBar.removeFromLeft (230));
@@ -438,7 +505,9 @@ void AutoplayGridPanel::resized()
     progressionBar.removeFromLeft (6);
     deletePresetButton.setBounds (progressionBar.removeFromLeft (70));
 
-    bounds.removeFromTop (10);
+    bounds.removeFromTop (14);
+    performanceSectionLabel.setBounds (bounds.removeFromTop (16).reduced (20, 0));
+    bounds.removeFromTop (6);
     auto globalControlsBar = bounds.removeFromTop (26).reduced (20, 0);
     swingLabel.setBounds (globalControlsBar.removeFromLeft (46));
     swingSlider.setBounds (globalControlsBar.removeFromLeft (170));
@@ -455,11 +524,20 @@ void AutoplayGridPanel::resized()
     togglesBar.removeFromLeft (12);
     humanizeButton.setBounds (togglesBar.removeFromLeft (110));
 
-    bounds.removeFromTop (10);
+    bounds.removeFromTop (14);
+    chordBankSectionLabel.setBounds (bounds.removeFromTop (16).reduced (20, 0));
+    bounds.removeFromTop (6);
     chordPadRow.setBounds (bounds.removeFromTop (56).reduced (20, 0));
 
-    bounds.removeFromTop (12);
+    bounds.removeFromTop (14);
+    autoplaySectionLabel.setBounds (bounds.removeFromTop (16).reduced (20, 0));
+    bounds.removeFromTop (6);
     autoplayGrid.setBounds (bounds.removeFromTop (190).reduced (20, 0));
+
+    bounds.removeFromTop (5);
+    auto captionRow = bounds.removeFromTop (14).reduced (20, 0);
+    simpleCaptionLabel.setBounds (captionRow.removeFromLeft (100));
+    complexCaptionLabel.setBounds (captionRow.removeFromRight (100));
 
     bounds.removeFromTop (14);
     patternReadout.setBounds (bounds.removeFromTop (60).reduced (20, 0));

@@ -199,7 +199,7 @@ void SmartChordAudioProcessorEditor::pushStateToProcessor()
 
 void SmartChordAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (ui::Palette::background);
+    g.fillAll (ui::Palette::ink);
 }
 
 void SmartChordAudioProcessorEditor::resized()

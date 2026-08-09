@@ -7,14 +7,21 @@ void AutoplayGridComponent::GridCell::paintButton (juce::Graphics& g, bool isMou
 {
     auto bounds = getLocalBounds().toFloat();
 
-    juce::Colour fill { 0xffF3F4F6 };
-
     if (isSelected)
-        fill = accent;
-    else if (isActiveColumn)
-        fill = juce::Colour (0xffEDF6F1);
-    else if (isMouseOverButton)
-        fill = juce::Colour (0xffE7E9EC);
+    {
+        // Bagliore intorno alla cella accesa: un rettangolo piu' grande e trasparente
+        // sotto quello pieno, come il puntino del FamilySwitcher - stessa tecnica, stesso
+        // motivo (niente vero blur per una cella ridisegnata spesso).
+        g.setColour (accent.withAlpha (0.35f));
+        g.fillRoundedRectangle (bounds.expanded (1.5f), 4.0f);
+        g.setColour (accent);
+        g.fillRoundedRectangle (bounds, 3.0f);
+        return;
+    }
+
+    juce::Colour fill = Palette::text.withAlpha (isActiveColumn ? 0.10f : 0.05f);
+    if (isMouseOverButton)
+        fill = Palette::text.withAlpha (0.16f);
 
     g.setColour (fill);
     g.fillRoundedRectangle (bounds, 3.0f);
@@ -58,8 +65,17 @@ void AutoplayGridComponent::refreshFrom (const AutoplayGridState& gridState, Ins
 
 void AutoplayGridComponent::paint (juce::Graphics& g)
 {
-    g.setColour (Palette::panel);
-    g.fillRoundedRectangle (getLocalBounds().toFloat(), 14.0f);
+    // Incassata rispetto al corpo del plugin, come una matrice LED vista dall'alto:
+    // un'ombra interna leggera invece di un riempimento piatto la fa leggere come un
+    // "buco" nel pannello, non come un'altra card in rilievo.
+    auto bounds = getLocalBounds().toFloat();
+    g.setColour (Palette::panelInset);
+    g.fillRoundedRectangle (bounds, 12.0f);
+
+    juce::ColourGradient shadow (Palette::seam.withAlpha (0.5f), bounds.getX(), bounds.getY(),
+                                  juce::Colours::transparentBlack, bounds.getX(), bounds.getY() + 14.0f, false);
+    g.setGradientFill (shadow);
+    g.fillRoundedRectangle (bounds, 12.0f);
 }
 
 void AutoplayGridComponent::resized()

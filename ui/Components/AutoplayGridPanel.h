@@ -109,6 +109,19 @@ private:
     InstrumentFamily activeFamily;
 
     juce::Label titleLabel;
+
+    // Etichette "eyebrow" mono tracciate, come le sezioni di un pannello hardware
+    // (INSTRUMENT/BANK/PERFORMANCE/CHORD BANK/AUTOPLAY). performanceSectionLabel segue
+    // la visibilita' di swing/gate/ottava (plugin-only, vedi setGlobalControlsVisible);
+    // le altre sono sempre visibili.
+    juce::Label instrumentSectionLabel;
+    juce::Label bankSectionLabel;
+    juce::Label performanceSectionLabel;
+    juce::Label chordBankSectionLabel;
+    juce::Label autoplaySectionLabel;
+    juce::Label simpleCaptionLabel;
+    juce::Label complexCaptionLabel;
+
     juce::ToggleButton freeRunButton { "Suona a trasporto fermo" };
     juce::ToggleButton voiceLeadingButton { "Voice leading" };
     juce::ToggleButton chordFromKeyboardButton { "Accordi da tastiera" };
