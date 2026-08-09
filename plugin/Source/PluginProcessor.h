@@ -11,6 +11,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <array>
 #include <atomic>
 #include <optional>
 #include <random>
@@ -31,10 +32,14 @@ namespace smartchord
 //  - strumento (VSTi): espone un'uscita audio che resta silenziosa, per gli host che non
 //    ospitano i MIDI FX VST3 (Ableton Live).
 //
-// Lo stato condiviso con la UI (ChordBankModule, AutoplayGridState, famiglia attiva) e'
-// protetto da un lock breve: la UI lo modifica raramente (interazione utente), il thread
-// audio ne fa una copia di lavoro a inizio blocco, cosi' il lock non resta mai preso per
-// la durata di processBlock().
+// Stato condiviso con la UI (SPEC.md sezione 8): tutto cio' che ha senso automatizzare
+// dall'host - accordo attivo, intensita' per (accordo, famiglia), rate, swing globale,
+// gate globale, range d'ottava, famiglia attiva - vive in AudioProcessorValueTreeState,
+// letto in processBlock() come atomici semplici (nessun lock, nessuna allocazione). Resta
+// dietro un lock breve solo il contenuto dei pad (le 8 ChordDefinition): SPEC.md non lo
+// richiede automatizzabile, e' modificato solo dal menu di modifica accordo (interazione
+// utente rara), quindi il lock non e' mai conteso dal thread audio per piu' di una copia
+// di 8 struct.
 class SmartChordAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -69,15 +74,30 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     // --- API thread-safe per la UI (message thread) --------------------------------
+    // SPEC.md sezione 8: passano tutte attraverso apvts, quindi ogni valore e' anche
+    // automatizzabile dall'host, non solo impostabile da UI.
     void setActiveSlot (int slot);
     void setChordAt (int slot, const ChordDefinition& chord);
     void setIntensityAt (InstrumentFamily family, int chordSlot, int intensityLevel);
     void setActiveFamily (InstrumentFamily family);
+    void setPatternRate (PatternRate rate);
+    PatternRate getPatternRate() const;
+
+    // Swing globale (0-1) e moltiplicatore di gate globale, che si sommano/combinano a
+    // quelli del pattern attivo; range d'ottava (-2..+2) che trasla l'intero voicing.
+    void setGlobalSwing (float amount01);
+    float getGlobalSwing() const;
+    void setGlobalGateLength (float multiplier);
+    float getGlobalGateLength() const;
+    void setOctaveRange (int octaves);
+    int getOctaveRange() const;
 
     // Quando true l'arpeggiatore suona anche a trasporto fermo, usando un clock interno
     // al posto della posizione PPQ dell'host (utile per provare accordi e pattern senza
     // far girare la sessione). Di default false: il comportamento sincronizzato al
-    // trasporto e' quello atteso da una DAW.
+    // trasporto e' quello atteso da una DAW. Non fa parte della lista automatizzabile di
+    // SPEC.md sezione 8 (e' una preferenza d'uso, non un parametro musicale), quindi resta
+    // un semplice atomico invece che un parametro apvts.
     void setFreeRunWhenStopped (bool shouldFreeRun) { freeRunWhenStopped.store (shouldFreeRun, std::memory_order_relaxed); }
     bool getFreeRunWhenStopped() const { return freeRunWhenStopped.load (std::memory_order_relaxed); }
 
@@ -86,49 +106,67 @@ public:
     void setVoiceLeading (bool shouldLead) { voiceLeadingEnabled.store (shouldLead, std::memory_order_relaxed); }
     bool getVoiceLeading() const { return voiceLeadingEnabled.load (std::memory_order_relaxed); }
 
-    // Moltiplicatore globale sulla velocita' dei pattern: lo stesso pattern suona a
-    // meta', a doppio o in terzine senza doverne scrivere una variante.
-    void setPatternRate (PatternRate rate) { patternRate.store (rate, std::memory_order_relaxed); }
-    PatternRate getPatternRate() const { return patternRate.load (std::memory_order_relaxed); }
-
     // Quando true, le note suonate sopra la fascia dei keyswitch vengono riconosciute come
     // accordo e prendono il posto di quello selezionato sul banco, finche' restano premute.
     void setChordFromKeyboard (bool shouldRecognize) { chordFromKeyboard.store (shouldRecognize, std::memory_order_relaxed); }
     bool getChordFromKeyboard() const { return chordFromKeyboard.load (std::memory_order_relaxed); }
 
-
     // true (una sola volta) se un keyswitch MIDI ha cambiato lo slot attivo da quando e'
     // stato interrogato l'ultima volta: l'editor lo usa per riallinearsi.
     bool consumeSlotChangedByMidi() { return slotChangedByMidi.exchange (false, std::memory_order_acq_rel); }
 
+    int getActiveSlotSnapshot() const;
     ChordBankModule getChordBankSnapshot() const;
     AutoplayGridState getGridStateSnapshot() const;
     InstrumentFamily getActiveFamilySnapshot() const;
+
+    // Posizione normalizzata (0-1) nel loop attualmente in esecuzione, aggiornata dal
+    // thread audio a ogni blocco: e' cio' che disegna il playhead sulla UI (SPEC.md
+    // sezione 9). 0 quando non sta suonando nulla.
+    float getLoopPositionSnapshot() const { return loopPositionNormalized.load (std::memory_order_relaxed); }
+
     const PatternLibrary& getPatternLibrary() const noexcept { return patternLibrary; }
 
 private:
-    void regenerateAudioThreadLoop (double bpm, const ChordDefinition& chord);
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    void regenerateAudioThreadLoop (const ChordDefinition& chord, InstrumentFamily family,
+                                     int intensityLevel, const SyncClock& clock, int octaveRange);
 
     // Caricata una sola volta nel costruttore, mai modificata dopo: sicura senza lock.
     PatternLibrary patternLibrary;
 
-    // Stato autorevole, condiviso con la UI: protetto da stateLock.
-    mutable juce::CriticalSection stateLock;
-    ChordBankModule chordBank;
-    AutoplayGridState gridState;
-    InstrumentFamily activeFamily = InstrumentFamily::Guitar;
+    // I parametri di SPEC.md sezione 8. apvts.getRawParameterValue() restituisce un
+    // std::atomic<float>* aggiornato in modo sincrono e lock-free a ogni cambiamento, sia
+    // che arrivi dalla UI sia che arrivi dall'automazione dell'host: e' il meccanismo che
+    // rende il resto del thread audio libero da lock.
+    juce::AudioProcessorValueTreeState apvts;
 
-    // Copie di lavoro usate esclusivamente dal thread audio in processBlock().
-    ChordBankModule audioChordBank;
-    AutoplayGridState audioGridState;
-    InstrumentFamily audioFamily = InstrumentFamily::Guitar;
+    // Puntatori cache verso i parametri: risolti una volta nel costruttore invece che
+    // per stringa a ogni blocco. Di proprieta' di apvts, validi per tutta la vita del
+    // processor.
+    juce::RangedAudioParameter* activeChordSlotParam = nullptr;
+    std::atomic<float>* activeFamilyRaw = nullptr;
+    std::atomic<float>* activeChordSlotRaw = nullptr;
+    std::atomic<float>* rateRaw = nullptr;
+    std::atomic<float>* globalSwingRaw = nullptr;
+    std::atomic<float>* globalGateRaw = nullptr;
+    std::atomic<float>* octaveRangeRaw = nullptr;
+    std::array<std::array<std::atomic<float>*, numChordSlots>, 4> intensityRaw {};
+
+    // Contenuto degli 8 pad (SPEC.md sezione 3): non fa parte della lista automatizzabile
+    // di SPEC.md sezione 8, quindi resta fuori da apvts. Protetto da un lock breve: la UI
+    // lo modifica solo tramite il menu di modifica accordo (interazione rara), il thread
+    // audio ne fa una copia di lavoro a inizio blocco.
+    mutable juce::CriticalSection chordContentLock;
+    ChordBankModule chordBankContent;
+    ChordBankModule audioChordBankContent;
 
     // Scritto dal thread audio quando un keyswitch cambia lo slot, letto dall'editor.
     std::atomic<bool> slotChangedByMidi { false };
 
     std::atomic<bool> freeRunWhenStopped { false };
     std::atomic<bool> voiceLeadingEnabled { true };
-    std::atomic<PatternRate> patternRate { PatternRate::Normal };
     std::atomic<bool> chordFromKeyboard { false };
 
     // Note attualmente premute sulla tastiera, sopra la fascia dei keyswitch. Usato solo
@@ -147,11 +185,16 @@ private:
     std::vector<NoteEvent> currentLoopEvents;
     double currentLoopLengthBeats = 0.0;
 
+    std::atomic<float> loopPositionNormalized { 0.0f };
+
     int previousActiveSlot = -1;
     InstrumentFamily previousFamily = InstrumentFamily::Piano;
     int previousIntensity = -1;
     ChordDefinition previousChord;
     PatternRate previousRate = PatternRate::Normal;
+    float previousSwing = -1.0f;
+    float previousGate = -1.0f;
+    int previousOctaveRange = 0;
     bool havePreviousSelection = false;
 
     double currentSampleRate = 44100.0;

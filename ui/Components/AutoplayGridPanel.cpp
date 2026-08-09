@@ -143,7 +143,62 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     keyBox.onChange = [this] { applySelectedProgression(); };
     addAndMakeVisible (keyBox);
 
-    setSize (820, 520);
+    // Swing/gate/ottava globali (SPEC.md sezione 8): automatizzabili solo dentro il
+    // plugin, quindi nascosti di default come rate/freeRun/voiceLeading/keyboard.
+    for (auto* label : { &swingLabel, &gateLabel, &octaveLabel })
+    {
+        label->setFont (juce::FontOptions (12.0f));
+        label->setColour (juce::Label::textColourId, Palette::textMuted);
+        label->setJustificationType (juce::Justification::centredRight);
+        label->setVisible (false);
+        addChildComponent (label);
+    }
+
+    swingSlider.setRange (0.0, 1.0);
+    swingSlider.setTextValueSuffix ("%");
+    swingSlider.setColour (juce::Slider::textBoxTextColourId, Palette::text);
+    swingSlider.setColour (juce::Slider::textBoxOutlineColourId, Palette::panelEdge);
+    swingSlider.textFromValueFunction = [] (double value) { return juce::String (juce::roundToInt (value * 100.0)); };
+    swingSlider.valueFromTextFunction = [] (const juce::String& text) { return text.getDoubleValue() / 100.0; };
+    swingSlider.setValue (0.0, juce::dontSendNotification);
+    swingSlider.updateText(); // setValue() salta updateText() se il valore non cambia (vedi setGlobalSwing)
+    swingSlider.setVisible (false);
+    swingSlider.onValueChange = [this]
+    {
+        if (onGlobalSwingChanged != nullptr)
+            onGlobalSwingChanged (static_cast<float> (swingSlider.getValue()));
+    };
+    addChildComponent (swingSlider);
+
+    gateSlider.setRange (0.25, 1.5);
+    gateSlider.setTextValueSuffix ("%");
+    gateSlider.setColour (juce::Slider::textBoxTextColourId, Palette::text);
+    gateSlider.setColour (juce::Slider::textBoxOutlineColourId, Palette::panelEdge);
+    gateSlider.textFromValueFunction = [] (double value) { return juce::String (juce::roundToInt (value * 100.0)); };
+    gateSlider.valueFromTextFunction = [] (const juce::String& text) { return text.getDoubleValue() / 100.0; };
+    gateSlider.setValue (1.0, juce::dontSendNotification);
+    gateSlider.updateText();
+    gateSlider.setVisible (false);
+    gateSlider.onValueChange = [this]
+    {
+        if (onGlobalGateLengthChanged != nullptr)
+            onGlobalGateLengthChanged (static_cast<float> (gateSlider.getValue()));
+    };
+    addChildComponent (gateSlider);
+
+    for (int octave = -2; octave <= 2; ++octave)
+        octaveBox.addItem (octave == 0 ? "0" : juce::String::formatted ("%+d", octave), octave + 3);
+    octaveBox.setSelectedId (3, juce::dontSendNotification);
+    styleComboBox (octaveBox);
+    octaveBox.setVisible (false);
+    octaveBox.onChange = [this]
+    {
+        if (onOctaveRangeChanged != nullptr)
+            onOctaveRangeChanged (octaveBox.getSelectedId() - 3);
+    };
+    addChildComponent (octaveBox);
+
+    setSize (820, 556);
     refresh();
 }
 
@@ -154,6 +209,17 @@ void AutoplayGridPanel::setFreeRunControlVisible (bool shouldBeVisible)
     rateLabel.setVisible (shouldBeVisible);
     rateBox.setVisible (shouldBeVisible);
     chordFromKeyboardButton.setVisible (shouldBeVisible);
+    setGlobalControlsVisible (shouldBeVisible);
+}
+
+void AutoplayGridPanel::setGlobalControlsVisible (bool shouldBeVisible)
+{
+    swingLabel.setVisible (shouldBeVisible);
+    swingSlider.setVisible (shouldBeVisible);
+    gateLabel.setVisible (shouldBeVisible);
+    gateSlider.setVisible (shouldBeVisible);
+    octaveLabel.setVisible (shouldBeVisible);
+    octaveBox.setVisible (shouldBeVisible);
 }
 
 void AutoplayGridPanel::setFreeRun (bool shouldFreeRun)
@@ -174,6 +240,36 @@ void AutoplayGridPanel::setPatternRate (PatternRate rate)
 void AutoplayGridPanel::setChordFromKeyboard (bool shouldRecognize)
 {
     chordFromKeyboardButton.setToggleState (shouldRecognize, juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::setGlobalSwing (float amount01)
+{
+    // setValue() non aggiorna la casella di testo se il valore non cambia (es. resta a
+    // 0): updateText() esplicito copre anche quel caso.
+    swingSlider.setValue (amount01, juce::dontSendNotification);
+    swingSlider.updateText();
+}
+
+void AutoplayGridPanel::setGlobalGateLength (float multiplier)
+{
+    gateSlider.setValue (multiplier, juce::dontSendNotification);
+    gateSlider.updateText();
+}
+
+void AutoplayGridPanel::setOctaveRange (int octaves)
+{
+    octaveBox.setSelectedId (octaves + 3, juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::setPlayheadPosition (float normalized)
+{
+    patternReadout.setPlayheadPosition (normalized);
+}
+
+void AutoplayGridPanel::setActiveFamily (InstrumentFamily family)
+{
+    activeFamily = family;
+    familySwitcher.setSelectedFamily (activeFamily);
 }
 
 void AutoplayGridPanel::applySelectedProgression()
@@ -243,6 +339,17 @@ void AutoplayGridPanel::resized()
     progressionBox.setBounds (progressionBar.removeFromLeft (230));
     progressionBar.removeFromLeft (8);
     keyBox.setBounds (progressionBar.removeFromLeft (70));
+
+    bounds.removeFromTop (10);
+    auto globalControlsBar = bounds.removeFromTop (26).reduced (20, 0);
+    swingLabel.setBounds (globalControlsBar.removeFromLeft (46));
+    swingSlider.setBounds (globalControlsBar.removeFromLeft (170));
+    globalControlsBar.removeFromLeft (16);
+    gateLabel.setBounds (globalControlsBar.removeFromLeft (40));
+    gateSlider.setBounds (globalControlsBar.removeFromLeft (170));
+    globalControlsBar.removeFromLeft (16);
+    octaveLabel.setBounds (globalControlsBar.removeFromLeft (48));
+    octaveBox.setBounds (globalControlsBar.removeFromLeft (64));
 
     bounds.removeFromTop (10);
     chordPadRow.setBounds (bounds.removeFromTop (56).reduced (20, 0));

@@ -124,6 +124,12 @@ std::vector<NoteEvent> generateSequence (const PatternDefinition& pattern,
         int velocity = static_cast<size_t> (step) < pattern.velocityCurve.size()
             ? pattern.velocityCurve[static_cast<size_t> (step)] : defaultVelocity;
 
+        // Gate globale (SPEC.md sezione 8): scala il gate di ogni step senza toccare i
+        // dati del pattern, cosi' un host puo' automatizzare stondato/legato in tempo
+        // reale. clamp a un minimo perche' un gate a 0 spegnerebbe la nota nell'istante
+        // in cui si accende.
+        gate = std::max (0.02f, gate * static_cast<float> (clock.gateLengthMultiplier > 0.0 ? clock.gateLengthMultiplier : 1.0));
+
         if (muted)
         {
             gate *= palmMuteGateScale;

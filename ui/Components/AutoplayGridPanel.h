@@ -33,6 +33,11 @@ public:
 
     InstrumentFamily getActiveFamily() const noexcept { return activeFamily; }
 
+    // Cambia la famiglia attiva senza passare dal click sul FamilySwitcher (es. quando la
+    // famiglia e' cambiata da automazione host - SPEC.md sezione 8). Non chiama refresh():
+    // il chiamante che aggiorna piu' campi insieme lo fa una volta sola alla fine.
+    void setActiveFamily (InstrumentFamily family);
+
     // Da chiamare quando lo stato esterno cambia per motivi non originati da questo
     // pannello (es. host che ripristina uno stato salvato).
     void refresh();
@@ -59,6 +64,22 @@ public:
     void setChordFromKeyboard (bool shouldRecognize);
     std::function<void (bool)> onChordFromKeyboardChanged;
 
+    // Swing globale (0-1), gate globale (moltiplicatore 0.25-1.5) e range d'ottava
+    // (-2..+2): gli ultimi tre automatizzabili di SPEC.md sezione 8, oltre a rate e alla
+    // griglia di intensita' gia' esposti altrove nel pannello.
+    void setGlobalSwing (float amount01);
+    std::function<void (float)> onGlobalSwingChanged;
+
+    void setGlobalGateLength (float multiplier);
+    std::function<void (float)> onGlobalGateLengthChanged;
+
+    void setOctaveRange (int octaves);
+    std::function<void (int)> onOctaveRangeChanged;
+
+    // Posizione normalizzata (0-1) nel loop in esecuzione, per il playhead (SPEC.md
+    // sezione 9); fuori da [0,1] lo nasconde.
+    void setPlayheadPosition (float normalized);
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
@@ -78,7 +99,15 @@ private:
     juce::ComboBox progressionBox;
     juce::ComboBox keyBox;
 
+    juce::Label swingLabel { {}, "Swing" };
+    juce::Slider swingSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Label gateLabel { {}, "Gate" };
+    juce::Slider gateSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Label octaveLabel { {}, "Ottava" };
+    juce::ComboBox octaveBox;
+
     void applySelectedProgression();
+    void setGlobalControlsVisible (bool shouldBeVisible);
     FamilySwitcher familySwitcher;
     ChordPadRow chordPadRow;
     AutoplayGridComponent autoplayGrid;

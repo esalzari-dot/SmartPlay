@@ -33,6 +33,7 @@ struct SyncClock
     double bpm = 120.0;
     double globalSwingAmount = 0.0;   // 0-1, si combina con lo swingAmount del pattern
     double rateMultiplier = 1.0;      // vedi PatternRate/rateMultiplierFor
+    double gateLengthMultiplier = 1.0; // scala gateLength di ogni step (SPEC.md sezione 8)
 };
 
 struct NoteEvent

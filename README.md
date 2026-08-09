@@ -107,6 +107,17 @@ rispetto alle build precedenti, solo core + test.
 - **Rate** (in alto a destra): moltiplicatore globale sulla velocità del pattern —
   `1/2x`, `1x`, `Terzine`, `2x`. Lo stesso pattern suona a metà, a doppio o in terzine
   senza doverne scrivere una variante.
+- **Swing / Gate / Ottava** (sotto la riga di progressione): tre controlli globali che si
+  sommano a quelli del pattern invece di sostituirli. **Swing** ritarda gli step in
+  levare, **Gate** allunga o accorcia ogni nota (25%-150%), **Ottava** trasla l'intero
+  voicing di ±2 ottave.
+- **Playhead**: la striscia sottile in fondo al riquadro del pattern mostra il punto in
+  cui si trova l'esecuzione dentro il loop corrente.
+- **Automazione host**: accordo attivo, famiglia attiva, intensità di ogni cella della
+  griglia, rate, swing, gate e ottava sono tutti parametri automatizzabili — visibili
+  nella lane di automazione della DAW, non solo controllabili da questa UI. Un cambio
+  fatto dall'host (automazione, o un altro controller che scrive lo stesso parametro) si
+  riflette sulla UI entro un frame o due, esattamente come un keyswitch.
 
 ## Personalizzare i pattern
 

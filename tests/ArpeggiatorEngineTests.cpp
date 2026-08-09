@@ -901,3 +901,81 @@ TEST_CASE("una strimpellata parziale si ottiene con le pause dentro lo step", "[
     CHECK(firstStepNotes == 2);
     CHECK(secondStepNotes == 1);
 }
+
+// --- Gate globale e swing globale (SPEC.md sezione 8) -------------------------------
+
+TEST_CASE("gateLengthMultiplier scala il gate di ogni step", "[ArpeggiatorEngine]")
+{
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0, 1};
+    pattern.rhythmGrid = {1.0f, 1.0f};
+    pattern.gateLength = {0.5f, 0.5f};
+
+    const VoicingResult voicing{{60, 64}, 1};
+
+    SyncClock shortened;
+    shortened.gateLengthMultiplier = 0.5;
+    const auto shortEvents = generateSequence(pattern, voicing, shortened);
+    CHECK(hasNoteOff(shortEvents, 60, 0.25));
+
+    SyncClock lengthened;
+    lengthened.gateLengthMultiplier = 1.5;
+    const auto longEvents = generateSequence(pattern, voicing, lengthened);
+    CHECK(hasNoteOff(longEvents, 60, 0.75));
+}
+
+TEST_CASE("un gateLengthMultiplier non valido lascia il gate del pattern invariato", "[ArpeggiatorEngine]")
+{
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0};
+    pattern.rhythmGrid = {1.0f};
+    pattern.gateLength = {0.6f};
+
+    const VoicingResult voicing{{60}, 0};
+
+    SyncClock broken;
+    broken.gateLengthMultiplier = 0.0;
+
+    const auto events = generateSequence(pattern, voicing, broken);
+    CHECK(hasNoteOff(events, 60, 0.6));
+}
+
+TEST_CASE("gateLengthMultiplier non spegne mai la nota nell'istante in cui si accende", "[ArpeggiatorEngine]")
+{
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0};
+    pattern.rhythmGrid = {1.0f};
+    pattern.gateLength = {0.5f};
+
+    const VoicingResult voicing{{60}, 0};
+
+    SyncClock silenced;
+    silenced.gateLengthMultiplier = 0.0001;
+
+    const auto events = generateSequence(pattern, voicing, silenced);
+
+    double onBeat = -1.0, offBeat = -1.0;
+    for (const auto& e : events)
+    {
+        if (e.kind == NoteEvent::Kind::NoteOn) onBeat = e.beatPosition;
+        if (e.kind == NoteEvent::Kind::NoteOff) offBeat = e.beatPosition;
+    }
+    CHECK(offBeat > onBeat);
+}
+
+TEST_CASE("globalSwingAmount di SyncClock si somma allo swing del pattern", "[ArpeggiatorEngine]")
+{
+    // Copre il percorso reale usato dal plugin (SPEC.md sezione 8: swing globale
+    // automatizzabile), non solo la combinazione gia' testata altrove con swing di pattern.
+    PatternDefinition pattern;
+    pattern.noteOrderSequence = {0, 0};
+    pattern.rhythmGrid = {1.0f, 1.0f};
+
+    const VoicingResult voicing{{60}, 0};
+
+    SyncClock swung;
+    swung.globalSwingAmount = 0.4;
+
+    const auto events = generateSequence(pattern, voicing, swung);
+    CHECK(hasNoteOn(events, 60, 1.2, defaultVelocity));
+}
