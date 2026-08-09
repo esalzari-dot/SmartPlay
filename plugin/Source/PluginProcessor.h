@@ -3,6 +3,7 @@
 #include "smartchord/ArpeggiatorEngine.h"
 #include "smartchord/AutoplayGridState.h"
 #include "smartchord/ChordBankModule.h"
+#include "smartchord/LoopClock.h"
 #include "smartchord/MidiOutputManager.h"
 #include "smartchord/PatternLibrary.h"
 #include "smartchord/VoicingEngine.h"
@@ -122,10 +123,9 @@ private:
 
     MidiOutputManager midiOutputManager;
 
+    LoopClock loopClock;
     std::vector<NoteEvent> currentLoopEvents;
     double currentLoopLengthBeats = 0.0;
-    double loopPhaseOffsetBeats = 0.0;
-    double internalBeatPosition = 0.0; // usata solo se l'host non fornisce la posizione PPQ
 
     int previousActiveSlot = -1;
     InstrumentFamily previousFamily = InstrumentFamily::Piano;

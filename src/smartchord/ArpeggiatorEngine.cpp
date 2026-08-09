@@ -150,9 +150,17 @@ std::vector<ScheduledEvent> scheduleEventsInWindow (const std::vector<NoteEvent>
 
         for (const auto& event : loopEvents)
         {
-            if (event.beatPosition >= localStart && event.beatPosition < localEnd)
+            // La posizione dell'evento va riportata dentro [0, loopLengthBeats): un
+            // NoteOff che cade esattamente sulla fine del loop (gate pieno sull'ultimo
+            // step) o oltre (swing sull'ultimo step) appartiene al passaggio successivo.
+            // Senza questa riduzione non verrebbe mai emesso e la nota resterebbe appesa.
+            double eventPosition = std::fmod (event.beatPosition, loopLengthBeats);
+            if (eventPosition < 0.0)
+                eventPosition += loopLengthBeats;
+
+            if (eventPosition >= localStart && eventPosition < localEnd)
             {
-                const double beatOffset = event.beatPosition - localStart;
+                const double beatOffset = eventPosition - localStart;
                 int sampleOffset = static_cast<int> (std::round (sampleBase + beatOffset * samplesPerBeat));
                 sampleOffset = std::clamp (sampleOffset, 0, std::max (0, blockNumSamples - 1));
                 result.push_back ({ event, sampleOffset });
@@ -164,8 +172,19 @@ std::vector<ScheduledEvent> scheduleEventsInWindow (const std::vector<NoteEvent>
         localStart = 0.0; // dopo il primo giro riparte dall'inizio del loop (wrap-around)
     }
 
-    std::sort (result.begin(), result.end(),
-               [] (const ScheduledEvent& a, const ScheduledEvent& b) { return a.sampleOffset < b.sampleOffset; });
+    // A parita' di campione il NoteOff precede il NoteOn: se una nota si spegne e
+    // riparte sullo stesso istante (gate pieno, o wrap-around del loop) l'ordine inverso
+    // la spegnerebbe subito dopo averla accesa. stable_sort perche' l'ordine fra eventi
+    // altrimenti equivalenti deve restare quello di generazione: due esecuzioni della
+    // stessa battuta devono produrre lo stesso identico flusso MIDI.
+    std::stable_sort (result.begin(), result.end(),
+                      [] (const ScheduledEvent& a, const ScheduledEvent& b)
+                      {
+                          if (a.sampleOffset != b.sampleOffset)
+                              return a.sampleOffset < b.sampleOffset;
+                          return a.event.kind == NoteEvent::Kind::NoteOff
+                              && b.event.kind == NoteEvent::Kind::NoteOn;
+                      });
 
     return result;
 }

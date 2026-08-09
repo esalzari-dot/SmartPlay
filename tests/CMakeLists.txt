@@ -15,6 +15,7 @@ add_executable(smartchord_tests
     ArpeggiatorEngineTests.cpp
     MidiOutputManagerTests.cpp
     ChordBankModuleTests.cpp
+    LoopClockTests.cpp
 )
 
 target_link_libraries(smartchord_tests PRIVATE smartchord_core Catch2::Catch2WithMain)

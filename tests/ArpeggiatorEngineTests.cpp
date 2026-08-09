@@ -2,6 +2,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "smartchord/ArpeggiatorEngine.h"
+#include "smartchord/MidiOutputManager.h"
+
+#include <map>
 
 using namespace smartchord;
 
@@ -409,4 +412,117 @@ TEST_CASE("generateSequence applies humanization only when given a generator", "
             anyDifference = true;
     }
     CHECK(anyDifference);
+}
+
+// --- Fedelta' del flusso MIDI: nessuna nota appesa, nessun evento perso ---------------
+//
+// Cio' che l'host registra e' esattamente il flusso prodotto da scheduleEventsInWindow,
+// quindi ogni NoteOff perso qui diventa una nota appesa nel MIDI registrato.
+
+TEST_CASE("scheduleEventsInWindow non perde il NoteOff che cade sulla fine del loop", "[ArpeggiatorEngine]")
+{
+    // Gate pieno sull'ultimo step: il NoteOff cade esattamente su loopLengthBeats, cioe'
+    // sull'inizio del passaggio successivo.
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 3.0},
+        {NoteEvent::Kind::NoteOff, 60, 0, 4.0},
+    };
+
+    const auto scheduled = scheduleEventsInWindow(loopEvents, 4.0, 3.0, 2.0, 100.0, 200);
+
+    int noteOffs = 0;
+    for (const auto& s : scheduled)
+        if (s.event.kind == NoteEvent::Kind::NoteOff && s.event.midiNote == 60)
+            ++noteOffs;
+
+    CHECK(noteOffs == 1);
+}
+
+TEST_CASE("scheduleEventsInWindow non perde un NoteOff spinto oltre la fine del loop", "[ArpeggiatorEngine]")
+{
+    // Lo swing sull'ultimo step puo' portare il NoteOff oltre la lunghezza del loop.
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 62, defaultVelocity, 3.5},
+        {NoteEvent::Kind::NoteOff, 62, 0, 4.2},
+    };
+
+    const auto scheduled = scheduleEventsInWindow(loopEvents, 4.0, 3.0, 2.0, 100.0, 200);
+
+    bool sawNoteOff = false;
+    for (const auto& s : scheduled)
+        if (s.event.kind == NoteEvent::Kind::NoteOff && s.event.midiNote == 62)
+            sawNoteOff = true;
+
+    CHECK(sawNoteOff);
+}
+
+TEST_CASE("scheduleEventsInWindow emette il NoteOff prima del NoteOn a parita' di campione", "[ArpeggiatorEngine]")
+{
+    // Nota ribattuta senza stacco: se il NoteOn arrivasse per primo, il NoteOff che lo
+    // segue spegnerebbe la nota appena accesa.
+    const std::vector<NoteEvent> loopEvents = {
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 0.0},
+        {NoteEvent::Kind::NoteOff, 60, 0, 1.0},
+        {NoteEvent::Kind::NoteOn, 60, defaultVelocity, 1.0},
+        {NoteEvent::Kind::NoteOff, 60, 0, 2.0},
+    };
+
+    const auto scheduled = scheduleEventsInWindow(loopEvents, 2.0, 0.9, 0.2, 100.0, 20);
+
+    REQUIRE(scheduled.size() == 2);
+    CHECK(scheduled[0].sampleOffset == scheduled[1].sampleOffset);
+    CHECK(scheduled[0].event.kind == NoteEvent::Kind::NoteOff);
+    CHECK(scheduled[1].event.kind == NoteEvent::Kind::NoteOn);
+}
+
+TEST_CASE("un pattern completo si chiude su ogni nota che apre, loop dopo loop", "[ArpeggiatorEngine]")
+{
+    PatternDefinition fullGate;
+    fullGate.noteOrderSequence = {0, 1, 2, 3};
+    fullGate.rhythmGrid = {0.25f, 0.25f, 0.25f, 0.25f};
+    fullGate.gateLength = {1.0f, 1.0f, 1.0f, 1.0f}; // legato: ogni NoteOff tocca lo step dopo
+
+    const VoicingResult voicing{{60, 64, 67, 72}, 2};
+    const auto loopEvents = generateSequence(fullGate, voicing);
+    const double loopLength = patternLoopLengthBeats(fullGate);
+
+    // Si riproduce la catena del plugin: lo scheduler propone gli eventi, MidiOutputManager
+    // filtra i NoteOff che non chiudono nulla (il NoteOff dell'ultimo step cade sul
+    // passaggio successivo, quindi al primo giro non ha corrispondenza).
+    MidiOutputManager output;
+    std::map<int, int> outstanding;
+    const double blockBeats = 0.125;
+
+    for (int block = 0; block < 24; ++block) // tre passaggi interi
+    {
+        const auto scheduled = scheduleEventsInWindow(loopEvents, loopLength,
+                                                      block * blockBeats, blockBeats, 1000.0, 125);
+
+        for (const auto& s : scheduled)
+        {
+            if (s.event.kind == NoteEvent::Kind::NoteOff && !output.isNoteActive(s.event.midiNote))
+                continue;
+
+            output.handleEvent(s.event);
+
+            if (s.event.kind == NoteEvent::Kind::NoteOn)
+                ++outstanding[s.event.midiNote];
+            else
+                --outstanding[s.event.midiNote];
+
+            // Nessuna nota deve mai risultare spenta piu' volte di quante e' stata accesa.
+            CHECK(outstanding[s.event.midiNote] >= 0);
+        }
+    }
+
+    // Ogni nota ha suonato tre volte (tre passaggi) e si e' chiusa, tranne quella
+    // dell'ultimo step: il suo NoteOff cade all'inizio del passaggio successivo, che
+    // qui non viene reso.
+    CHECK(output.getActiveNotes() == std::vector<int>{72});
+
+    int stillSounding = 0;
+    for (const auto& entry : outstanding)
+        stillSounding += entry.second;
+
+    CHECK(stillSounding == 1);
 }

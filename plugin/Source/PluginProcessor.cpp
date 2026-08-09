@@ -119,8 +119,7 @@ void SmartChordAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPe
     currentLoopEvents.clear();
     currentLoopLengthBeats = 0.0;
     havePreviousSelection = false;
-    internalBeatPosition = 0.0;
-    loopPhaseOffsetBeats = 0.0;
+    loopClock.reset();
 }
 
 void SmartChordAudioProcessor::releaseResources()
@@ -181,27 +180,30 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     if (numSamples <= 0)
         return;
 
-    double bpm = 120.0;
-    double hostPpq = 0.0;
-    bool hostProvidesPpq = false;
-    bool isPlaying = true;
+    TransportState transport;
 
     if (auto* playHead = getPlayHead())
     {
         if (auto position = playHead->getPosition())
         {
             if (auto bpmOpt = position->getBpm())
-                bpm = *bpmOpt;
+                transport.bpm = *bpmOpt;
 
             if (auto ppqOpt = position->getPpqPosition())
             {
-                hostPpq = *ppqOpt;
-                hostProvidesPpq = true;
+                transport.hostPpq = *ppqOpt;
+                transport.hostProvidesPpq = true;
             }
 
-            isPlaying = position->getIsPlaying();
+            transport.isPlaying = position->getIsPlaying();
         }
     }
+
+    // Un BPM non valido riportato dall'host renderebbe NaN tutta la temporizzazione.
+    if (! (transport.bpm > 0.0))
+        transport.bpm = 120.0;
+
+    const double bpm = transport.bpm;
 
     // Copia breve, sotto lock, dello stato condiviso con la UI verso le variabili di
     // lavoro del thread audio (SPEC.md sezione 8).
@@ -230,16 +232,6 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                                 || currentIntensity != previousIntensity;
 
     const bool freeRun = freeRunWhenStopped.load (std::memory_order_relaxed);
-    const bool shouldPlay = isPlaying || freeRun;
-
-    // Si segue la posizione dell'host finche' il trasporto gira; a trasporto fermo la
-    // PPQ dell'host e' congelata, quindi in free run si passa al clock interno. Tenerlo
-    // allineato mentre l'host comanda rende il passaggio continuo, senza salti di fase.
-    const bool useHostPosition = hostProvidesPpq && isPlaying;
-    if (useHostPosition)
-        internalBeatPosition = hostPpq;
-
-    const double rawPosition = useHostPosition ? hostPpq : internalBeatPosition;
 
     if (selectionChanged)
     {
@@ -251,7 +243,7 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
         // Fa ripartire il pattern dall'inizio, indipendentemente dalla posizione
         // assoluta dell'host: risponde subito al cambio, invece di "entrare" a meta'.
-        loopPhaseOffsetBeats = rawPosition;
+        loopClock.restartLoop();
 
         previousActiveSlot = activeSlot;
         previousFamily = audioFamily;
@@ -259,7 +251,14 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         havePreviousSelection = true;
     }
 
-    if (! shouldPlay || currentLoopEvents.empty() || currentLoopLengthBeats <= 0.0)
+    const double samplesPerBeat = (60.0 / bpm) * currentSampleRate;
+    const double blockLengthBeats = numSamples / samplesPerBeat;
+
+    // Il clock va fatto avanzare a ogni blocco, anche quando non si suona: e' lui a
+    // tenere il conto della fase e a ri-ancorarla ai cambi di sorgente del tempo.
+    const auto frame = loopClock.advance (transport, freeRun, blockLengthBeats);
+
+    if (! frame.shouldPlay || currentLoopEvents.empty() || currentLoopLengthBeats <= 0.0)
     {
         // Allo stop le note ancora suonanti vanno chiuse, altrimenti restano appese
         // nello strumento a valle (SPEC.md sezione 7).
@@ -269,27 +268,31 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         return;
     }
 
-    const double samplesPerBeat = (60.0 / bpm) * currentSampleRate;
-    const double blockLengthBeats = numSamples / samplesPerBeat;
-    const double windowStartBeat = rawPosition - loopPhaseOffsetBeats;
-
     const auto scheduled = scheduleEventsInWindow (currentLoopEvents, currentLoopLengthBeats,
-                                                    windowStartBeat, blockLengthBeats,
+                                                    frame.loopPosition, blockLengthBeats,
                                                     samplesPerBeat, numSamples);
 
     for (const auto& s : scheduled)
     {
         if (s.event.kind == NoteEvent::Kind::NoteOn)
+        {
             midiMessages.addEvent (juce::MidiMessage::noteOn (1, s.event.midiNote, static_cast<juce::uint8> (s.event.velocity)),
                                     s.sampleOffset);
+        }
+        else if (! midiOutputManager.isNoteActive (s.event.midiNote))
+        {
+            // Il NoteOff dell'ultimo step cade sull'inizio del passaggio successivo:
+            // al primo giro si riferisce quindi a una nota mai suonata. Emetterlo
+            // sporcherebbe il MIDI registrato con eventi senza corrispondenza.
+            continue;
+        }
         else
+        {
             midiMessages.addEvent (juce::MidiMessage::noteOff (1, s.event.midiNote), s.sampleOffset);
+        }
 
         midiOutputManager.handleEvent (s.event);
     }
-
-    if (! useHostPosition)
-        internalBeatPosition += blockLengthBeats;
 }
 
 juce::AudioProcessorEditor* SmartChordAudioProcessor::createEditor()
