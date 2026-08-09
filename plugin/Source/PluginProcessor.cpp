@@ -17,7 +17,11 @@ namespace
     // v5: aggiunge swing globale, gate globale e range d'ottava (SPEC.md sezione 8: gli
     //     stessi valori ora vivono in apvts, ma il formato binario resta lo stesso tipo di
     //     blob versionato delle versioni precedenti, per compatibilita' diretta.
-    constexpr int32_t stateFormatVersion = 5;
+    // v6: il banco accordi passa da 8 a 9 slot (tastierino numerico 1-9); aggiunge anche
+    //     i flag "switch a tempo" e "humanize attivo". Un file v<=5 ha solo 8 accordi e
+    //     8 colonne di intensita' nel mezzo dello stream: legacyChordSlots li isola.
+    constexpr int32_t stateFormatVersion = 6;
+    constexpr int legacyChordSlots = 8;
 
     juce::String familyParamKey (InstrumentFamily family)
     {
@@ -107,6 +111,7 @@ namespace
             { 4, ChordQuality::Min,  0, 0 },  // E min
             { 11, ChordQuality::Dim, 0, 0 },  // B dim
             { 0, ChordQuality::Dom7, 0, 0 },  // C7
+            { 7, ChordQuality::Dom7, 0, 0 },  // G7 (nono slot, tastierino: tasto 9)
         };
 
         ChordBankModule bank;
@@ -208,6 +213,9 @@ void SmartChordAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPe
     keyboardChord.reset();
     loopClock.reset();
     loopPositionNormalized.store (0.0f, std::memory_order_relaxed);
+    hasPendingChange = false;
+    previousLoopPositionLocal = -1.0;
+    loopWrappedLastBlock = false;
 }
 
 void SmartChordAudioProcessor::releaseResources()
@@ -240,7 +248,10 @@ void SmartChordAudioProcessor::regenerateAudioThreadLoop (const ChordDefinition&
 
     previousVoicing = voicing.notes;
 
-    currentLoopEvents = generateSequence (*pattern, voicing, clock, &humanizeRng);
+    // rng == nullptr disattiva humanizeTiming/humanizeVelocity anche se il pattern li
+    // prevede (generateSequence li applica solo quando gli viene passato un generatore).
+    std::mt19937* rng = humanizeEnabled.load (std::memory_order_relaxed) ? &humanizeRng : nullptr;
+    currentLoopEvents = generateSequence (*pattern, voicing, clock, rng);
     currentLoopLengthBeats = patternLoopLengthBeats (*pattern, clock.rateMultiplier);
 }
 
@@ -312,6 +323,8 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         transport.bpm = 120.0;
 
     const double bpm = transport.bpm;
+    const bool freeRun = freeRunWhenStopped.load (std::memory_order_relaxed);
+    const bool currentlyPlaying = transport.isPlaying || freeRun;
 
     // Contenuto dei pad: copia breve sotto lock (SPEC.md sezione 8). Non dipende dallo
     // slot attivo, che ora e' un parametro apvts letto piu' sotto senza lock.
@@ -364,6 +377,48 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float currentGate = globalGateRaw->load (std::memory_order_relaxed);
     const int currentOctaveRange = juce::jlimit (-2, 2,
         static_cast<int> (std::lround (octaveRangeRaw->load (std::memory_order_relaxed))));
+    const bool currentHumanizeEnabled = humanizeEnabled.load (std::memory_order_relaxed);
+
+    // Applica una selezione (panic + rigenera il loop + lo fa ripartire da capo) e la
+    // ricorda come "ultima applicata". Usata sia per un cambio immediato sia, piu' sotto,
+    // per un cambio in sospeso che arriva a destinazione.
+    const auto applySelection = [&] (int slot, InstrumentFamily fam, int intensity,
+                                      const ChordDefinition& chordToPlay, PatternRate rate,
+                                      float swing, float gate, int octaveRange)
+    {
+        // All-notes-off / panic al cambio di accordo o intensita' (SPEC.md sezione 7).
+        for (const auto& off : midiOutputManager.allNotesOff())
+            midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
+
+        const SyncClock clock { bpm, static_cast<double> (swing), rateMultiplierFor (rate), static_cast<double> (gate) };
+        regenerateAudioThreadLoop (chordToPlay, fam, intensity, clock, octaveRange);
+
+        // Fa ripartire il pattern dall'inizio, indipendentemente dalla posizione assoluta
+        // dell'host: risponde subito, invece di "entrare" a meta'.
+        loopClock.restartLoop();
+
+        previousActiveSlot = slot;
+        previousFamily = fam;
+        previousIntensity = intensity;
+        previousRate = rate;
+        previousChord = chordToPlay;
+        previousSwing = swing;
+        previousGate = gate;
+        previousOctaveRange = octaveRange;
+        havePreviousSelection = true;
+    };
+
+    // Un cambio in sospeso arriva a destinazione al giro di loop successivo, oppure subito
+    // se nel frattempo il trasporto si e' fermato: aspettare un loop che non sta suonando
+    // non avrebbe senso.
+    if (hasPendingChange && (loopWrappedLastBlock || ! currentlyPlaying))
+    {
+        applySelection (pendingSelection.activeSlot, pendingSelection.family, pendingSelection.intensityLevel,
+                         pendingSelection.chord, pendingSelection.rate, pendingSelection.swing,
+                         pendingSelection.gate, pendingSelection.octaveRange);
+        hasPendingChange = false;
+        loopWrappedLastBlock = false;
+    }
 
     const bool selectionChanged = ! havePreviousSelection
                                 || activeSlot != previousActiveSlot
@@ -373,33 +428,28 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
                                 || currentChord != previousChord
                                 || currentSwing != previousSwing
                                 || currentGate != previousGate
-                                || currentOctaveRange != previousOctaveRange;
-
-    const bool freeRun = freeRunWhenStopped.load (std::memory_order_relaxed);
+                                || currentOctaveRange != previousOctaveRange
+                                || currentHumanizeEnabled != previousHumanizeEnabled;
 
     if (selectionChanged)
     {
-        // All-notes-off / panic al cambio di accordo o intensita' (SPEC.md sezione 7).
-        for (const auto& off : midiOutputManager.allNotesOff())
-            midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
+        previousHumanizeEnabled = currentHumanizeEnabled; // non fa parte di PendingSelection: regenerateAudioThreadLoop rilegge sempre il flag corrente
 
-        const SyncClock clock { bpm, static_cast<double> (currentSwing),
-                                 rateMultiplierFor (currentRate), static_cast<double> (currentGate) };
-        regenerateAudioThreadLoop (currentChord, family, intensityLevel, clock, currentOctaveRange);
-
-        // Fa ripartire il pattern dall'inizio, indipendentemente dalla posizione
-        // assoluta dell'host: risponde subito al cambio, invece di "entrare" a meta'.
-        loopClock.restartLoop();
-
-        previousActiveSlot = activeSlot;
-        previousFamily = family;
-        previousIntensity = intensityLevel;
-        previousRate = currentRate;
-        previousChord = currentChord;
-        previousSwing = currentSwing;
-        previousGate = currentGate;
-        previousOctaveRange = currentOctaveRange;
-        havePreviousSelection = true;
+        // Con lo switch a tempo attivo, e mentre il loop sta gia' suonando, il cambio non
+        // scatta subito: resta in sospeso fino al prossimo giro (sopra), cosi' non taglia
+        // una nota o uno strum a meta'. Al primo blocco, o a trasporto fermo, si applica
+        // comunque subito: non c'e' nulla in corso da rispettare.
+        if (quantizeChordSwitch.load (std::memory_order_relaxed) && havePreviousSelection && currentlyPlaying)
+        {
+            pendingSelection = { activeSlot, family, intensityLevel, currentChord,
+                                  currentRate, currentSwing, currentGate, currentOctaveRange };
+            hasPendingChange = true;
+        }
+        else
+        {
+            applySelection (activeSlot, family, intensityLevel, currentChord, currentRate,
+                             currentSwing, currentGate, currentOctaveRange);
+        }
     }
 
     const double samplesPerBeat = (60.0 / bpm) * currentSampleRate;
@@ -409,7 +459,8 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     // tenere il conto della fase e a ri-ancorarla ai cambi di sorgente del tempo.
     const auto frame = loopClock.advance (transport, freeRun, blockLengthBeats);
 
-    // Posizione normalizzata nel loop, per il playhead sulla UI (SPEC.md sezione 9):
+    // Posizione normalizzata nel loop, per il playhead sulla UI (SPEC.md sezione 9) e per
+    // rilevare quando il loop ricomincia un giro (usato dal cambio in sospeso, sopra):
     // stessa riduzione modulo la lunghezza del loop usata da scheduleEventsInWindow, cosi'
     // il segno sulla griglia e il MIDI generato restano coerenti fra loro.
     if (frame.shouldPlay && currentLoopLengthBeats > 0.0)
@@ -419,10 +470,19 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             local += currentLoopLengthBeats;
 
         loopPositionNormalized.store (static_cast<float> (local / currentLoopLengthBeats), std::memory_order_relaxed);
+
+        // Il giro e' ricominciato se la posizione, che normalmente cresce, e' invece
+        // scesa rispetto al blocco precedente. Il cambio in sospeso (se c'e') viene
+        // applicato all'inizio del blocco SUCCESSIVO, non qui: usare gia' in questo
+        // blocco una posizione di playhead relativa al loop vecchio per programmare
+        // eventi del loop nuovo disallineerebbe tutto.
+        loopWrappedLastBlock = previousLoopPositionLocal >= 0.0 && local < previousLoopPositionLocal;
+        previousLoopPositionLocal = local;
     }
     else
     {
         loopPositionNormalized.store (0.0f, std::memory_order_relaxed);
+        previousLoopPositionLocal = -1.0;
     }
 
     if (! frame.shouldPlay || currentLoopEvents.empty() || currentLoopLengthBeats <= 0.0)
@@ -620,6 +680,8 @@ void SmartChordAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     stream.writeFloat (getGlobalSwing());
     stream.writeFloat (getGlobalGateLength());
     stream.writeInt (getOctaveRange());
+    stream.writeBool (quantizeChordSwitch.load (std::memory_order_relaxed));
+    stream.writeBool (humanizeEnabled.load (std::memory_order_relaxed));
 }
 
 void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -633,9 +695,15 @@ void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeIn
     setActiveFamily (static_cast<InstrumentFamily> (stream.readInt()));
     const int activeSlot = stream.readInt();
 
+    // v<=5 salvava 8 slot invece di 9 (introdotti per il tastierino numerico): lo stream
+    // in quel caso ha solo 8 accordi e 8 colonne di intensita' nel mezzo. Il nono slot
+    // (tasto 9) resta a ChordDefinition{}/intensita' 0 di default, come qualunque stato
+    // nuovo mai toccato.
+    const int storedChordSlots = version >= 6 ? numChordBankSlots : legacyChordSlots;
+
     {
         const juce::ScopedLock lock (chordContentLock);
-        for (int slot = 0; slot < numChordBankSlots; ++slot)
+        for (int slot = 0; slot < storedChordSlots; ++slot)
         {
             ChordDefinition chord;
             chord.rootSemitone = stream.readInt();
@@ -648,7 +716,7 @@ void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeIn
     setActiveSlot (activeSlot);
 
     for (auto family : allFamilies)
-        for (int slot = 0; slot < numChordSlots; ++slot)
+        for (int slot = 0; slot < storedChordSlots; ++slot)
             setIntensityAt (family, slot, stream.readInt());
 
     // Assenti negli stati salvati dalle versioni precedenti: restano al default.
@@ -672,6 +740,12 @@ void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeIn
         setGlobalSwing (stream.readFloat());
         setGlobalGateLength (stream.readFloat());
         setOctaveRange (stream.readInt());
+    }
+
+    if (version >= 6)
+    {
+        quantizeChordSwitch.store (stream.readBool(), std::memory_order_relaxed);
+        humanizeEnabled.store (stream.readBool(), std::memory_order_relaxed);
     }
 }
 

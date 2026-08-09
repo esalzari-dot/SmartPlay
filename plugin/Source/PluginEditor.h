@@ -3,6 +3,7 @@
 #include "PluginProcessor.h"
 
 #include "AutoplayGridPanel.h"
+#include "KeyboardChordShortcuts.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -22,6 +23,10 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+
+    // Tasti 1-9 (tastierino numerico o riga in alto) selezionano lo slot corrispondente
+    // quando la finestra del plugin ha il focus - vedi KeyboardChordShortcuts.h.
+    bool keyPressed (const juce::KeyPress& key) override;
 
 private:
     void pushStateToProcessor();

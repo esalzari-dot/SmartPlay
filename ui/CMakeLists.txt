@@ -12,6 +12,7 @@ target_sources(SmartChordArpUI PRIVATE
     Components/AutoplayGridComponent.cpp
     Components/PatternReadout.cpp
     Components/ChordLabel.cpp
+    Components/KeyboardChordShortcuts.cpp
 )
 
 target_include_directories(SmartChordArpUI PRIVATE Components)

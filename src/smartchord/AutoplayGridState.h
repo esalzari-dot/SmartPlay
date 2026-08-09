@@ -8,7 +8,9 @@
 namespace smartchord
 {
 
-constexpr int numChordSlots = 8;
+// Deve combaciare con numChordBankSlots (ChordBankModule.h): stesso numero di slot, letto
+// da due punti di vista diversi (banco accordi vs griglia intensita').
+constexpr int numChordSlots = 9;
 constexpr int minIntensityLevel = 0;
 constexpr int maxIntensityLevel = 3;
 

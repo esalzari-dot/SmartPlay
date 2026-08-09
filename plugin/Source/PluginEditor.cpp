@@ -60,9 +60,27 @@ SmartChordAudioProcessorEditor::SmartChordAudioProcessorEditor (SmartChordAudioP
         processorRef.setOctaveRange (octaves);
     };
 
+    panel.setQuantizeChordSwitch (processor.getQuantizeChordSwitch());
+    panel.onQuantizeChordSwitchChanged = [this] (bool shouldQuantize)
+    {
+        processorRef.setQuantizeChordSwitch (shouldQuantize);
+    };
+
+    panel.setHumanizeEnabled (processor.getHumanizeEnabled());
+    panel.onHumanizeEnabledChanged = [this] (bool shouldHumanize)
+    {
+        processorRef.setHumanizeEnabled (shouldHumanize);
+    };
+
     addAndMakeVisible (panel);
     setResizable (false, false);
     setSize (panel.getWidth(), panel.getHeight());
+
+    // Cattura le cifre 1-9 anche quando il focus e' su un pulsante/combobox della UI:
+    // in JUCE un tasto non gestito dal componente che ha il focus risale la gerarchia
+    // fino a trovare qualcuno che lo gestisce, e keyPressed() qui e' quel qualcuno.
+    setWantsKeyboardFocus (true);
+    grabKeyboardFocus();
 
     startTimerHz (20);
 }
@@ -159,6 +177,16 @@ void SmartChordAudioProcessorEditor::paint (juce::Graphics& g)
 void SmartChordAudioProcessorEditor::resized()
 {
     panel.setBounds (getLocalBounds());
+}
+
+bool SmartChordAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
+{
+    const int slot = ui::chordSlotForKeyPress (key, numChordBankSlots);
+    if (slot < 0)
+        return false;
+
+    processorRef.setActiveSlot (slot);
+    return true;
 }
 
 } // namespace smartchord

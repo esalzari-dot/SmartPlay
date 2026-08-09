@@ -198,7 +198,28 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (octaveBox);
 
-    setSize (820, 556);
+    quantizeSwitchButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+    quantizeSwitchButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    quantizeSwitchButton.setVisible (false);
+    quantizeSwitchButton.onClick = [this]
+    {
+        if (onQuantizeChordSwitchChanged != nullptr)
+            onQuantizeChordSwitchChanged (quantizeSwitchButton.getToggleState());
+    };
+    addChildComponent (quantizeSwitchButton);
+
+    humanizeButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+    humanizeButton.setColour (juce::ToggleButton::tickColourId, Palette::text);
+    humanizeButton.setToggleState (true, juce::dontSendNotification);
+    humanizeButton.setVisible (false);
+    humanizeButton.onClick = [this]
+    {
+        if (onHumanizeEnabledChanged != nullptr)
+            onHumanizeEnabledChanged (humanizeButton.getToggleState());
+    };
+    addChildComponent (humanizeButton);
+
+    setSize (820, 590);
     refresh();
 }
 
@@ -220,6 +241,8 @@ void AutoplayGridPanel::setGlobalControlsVisible (bool shouldBeVisible)
     gateSlider.setVisible (shouldBeVisible);
     octaveLabel.setVisible (shouldBeVisible);
     octaveBox.setVisible (shouldBeVisible);
+    quantizeSwitchButton.setVisible (shouldBeVisible);
+    humanizeButton.setVisible (shouldBeVisible);
 }
 
 void AutoplayGridPanel::setFreeRun (bool shouldFreeRun)
@@ -259,6 +282,16 @@ void AutoplayGridPanel::setGlobalGateLength (float multiplier)
 void AutoplayGridPanel::setOctaveRange (int octaves)
 {
     octaveBox.setSelectedId (octaves + 3, juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::setQuantizeChordSwitch (bool shouldQuantize)
+{
+    quantizeSwitchButton.setToggleState (shouldQuantize, juce::dontSendNotification);
+}
+
+void AutoplayGridPanel::setHumanizeEnabled (bool shouldHumanize)
+{
+    humanizeButton.setToggleState (shouldHumanize, juce::dontSendNotification);
 }
 
 void AutoplayGridPanel::setPlayheadPosition (float normalized)
@@ -350,6 +383,12 @@ void AutoplayGridPanel::resized()
     globalControlsBar.removeFromLeft (16);
     octaveLabel.setBounds (globalControlsBar.removeFromLeft (48));
     octaveBox.setBounds (globalControlsBar.removeFromLeft (64));
+
+    bounds.removeFromTop (8);
+    auto togglesBar = bounds.removeFromTop (26).reduced (20, 0);
+    quantizeSwitchButton.setBounds (togglesBar.removeFromLeft (140));
+    togglesBar.removeFromLeft (12);
+    humanizeButton.setBounds (togglesBar.removeFromLeft (110));
 
     bounds.removeFromTop (10);
     chordPadRow.setBounds (bounds.removeFromTop (56).reduced (20, 0));

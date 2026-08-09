@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AutoplayGridPanel.h"
+#include "KeyboardChordShortcuts.h"
 
 #include "smartchord/AutoplayGridState.h"
 #include "smartchord/ChordBankModule.h"
@@ -21,6 +22,7 @@ public:
     StandaloneComponent();
 
     void resized() override;
+    bool keyPressed (const juce::KeyPress& key) override;
 
 private:
     PatternLibrary patternLibrary;
