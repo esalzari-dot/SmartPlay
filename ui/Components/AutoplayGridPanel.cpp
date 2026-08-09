@@ -143,6 +143,49 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     keyBox.onChange = [this] { applySelectedProgression(); };
     addAndMakeVisible (keyBox);
 
+    presetLabel.setFont (juce::FontOptions (12.0f));
+    presetLabel.setColour (juce::Label::textColourId, Palette::textMuted);
+    addAndMakeVisible (presetLabel);
+
+    styleComboBox (presetBox);
+    presetBox.setTextWhenNoChoicesAvailable ("(nessuno)");
+    presetBox.setTextWhenNothingSelected ("(nessuno)");
+    presetBox.onChange = [this]
+    {
+        const auto name = presetBox.getText();
+        if (name.isNotEmpty() && onLoadPresetRequested != nullptr)
+            onLoadPresetRequested (name);
+    };
+    addAndMakeVisible (presetBox);
+
+    savePresetButton.onClick = [this]
+    {
+        // deleteWhenDismissed=true: la AlertWindow si distrugge da sola alla chiusura,
+        // non va cancellata a mano nella callback.
+        auto* dialog = new juce::AlertWindow ("Salva preset", "Nome del preset:", juce::AlertWindow::NoIcon);
+        dialog->addTextEditor ("name", presetBox.getText());
+        dialog->addButton ("Salva", 1, juce::KeyPress (juce::KeyPress::returnKey));
+        dialog->addButton ("Annulla", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        dialog->enterModalState (true, juce::ModalCallbackFunction::create ([this, dialog] (int result)
+        {
+            if (result != 1)
+                return;
+
+            const auto name = dialog->getTextEditorContents ("name").trim();
+            if (name.isNotEmpty() && onSavePresetRequested != nullptr)
+                onSavePresetRequested (name);
+        }), true);
+    };
+    addAndMakeVisible (savePresetButton);
+
+    deletePresetButton.onClick = [this]
+    {
+        const auto name = presetBox.getText();
+        if (name.isNotEmpty() && onDeletePresetRequested != nullptr)
+            onDeletePresetRequested (name);
+    };
+    addAndMakeVisible (deletePresetButton);
+
     // Swing/gate/ottava globali (SPEC.md sezione 8): automatizzabili solo dentro il
     // plugin, quindi nascosti di default come rate/freeRun/voiceLeading/keyboard.
     for (auto* label : { &swingLabel, &gateLabel, &octaveLabel })
@@ -299,6 +342,20 @@ void AutoplayGridPanel::setPlayheadPosition (float normalized)
     patternReadout.setPlayheadPosition (normalized);
 }
 
+void AutoplayGridPanel::setAvailablePresets (const juce::StringArray& names)
+{
+    const auto previouslySelected = presetBox.getText();
+
+    presetBox.clear (juce::dontSendNotification);
+    int id = 1;
+    for (const auto& name : names)
+        presetBox.addItem (name, id++);
+
+    const auto index = names.indexOf (previouslySelected);
+    if (index >= 0)
+        presetBox.setSelectedItemIndex (index, juce::dontSendNotification);
+}
+
 void AutoplayGridPanel::setActiveFamily (InstrumentFamily family)
 {
     activeFamily = family;
@@ -372,6 +429,14 @@ void AutoplayGridPanel::resized()
     progressionBox.setBounds (progressionBar.removeFromLeft (230));
     progressionBar.removeFromLeft (8);
     keyBox.setBounds (progressionBar.removeFromLeft (70));
+
+    progressionBar.removeFromLeft (20);
+    presetLabel.setBounds (progressionBar.removeFromLeft (46));
+    presetBox.setBounds (progressionBar.removeFromLeft (140));
+    progressionBar.removeFromLeft (6);
+    savePresetButton.setBounds (progressionBar.removeFromLeft (70));
+    progressionBar.removeFromLeft (6);
+    deletePresetButton.setBounds (progressionBar.removeFromLeft (70));
 
     bounds.removeFromTop (10);
     auto globalControlsBar = bounds.removeFromTop (26).reduced (20, 0);

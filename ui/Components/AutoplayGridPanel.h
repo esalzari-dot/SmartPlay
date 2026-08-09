@@ -90,6 +90,15 @@ public:
     // sezione 9); fuori da [0,1] lo nasconde.
     void setPlayheadPosition (float normalized);
 
+    // Preset del banco accordi salvati dall'utente. Il pannello non li persiste da solo
+    // (non ha accesso al filesystem, ed e' riusato anche dall'harness standalone): apre
+    // il dialogo per il nome e lascia al chiamante il salvataggio/cancellazione vero e
+    // proprio su disco, poi si aspetta un setAvailablePresets() aggiornato.
+    void setAvailablePresets (const juce::StringArray& names);
+    std::function<void (const juce::String& name)> onSavePresetRequested;
+    std::function<void (const juce::String& name)> onLoadPresetRequested;
+    std::function<void (const juce::String& name)> onDeletePresetRequested;
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
@@ -108,6 +117,11 @@ private:
     juce::Label progressionLabel;
     juce::ComboBox progressionBox;
     juce::ComboBox keyBox;
+
+    juce::Label presetLabel { {}, "Preset" };
+    juce::ComboBox presetBox;
+    juce::TextButton savePresetButton { "Salva..." };
+    juce::TextButton deletePresetButton { "Elimina" };
 
     juce::Label swingLabel { {}, "Swing" };
     juce::Slider swingSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

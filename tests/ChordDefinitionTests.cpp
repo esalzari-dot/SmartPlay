@@ -38,3 +38,24 @@ TEST_CASE("ChordDefinition default state is C major root position", "[ChordDefin
     CHECK(chord.inversion == 0);
     CHECK(chord.octaveOffset == 0);
 }
+
+TEST_CASE("toString/chordQualityFromString fanno un round-trip per ogni qualita'", "[ChordDefinition]")
+{
+    const ChordQuality allQualities[] = {
+        ChordQuality::Maj, ChordQuality::Min, ChordQuality::Dim, ChordQuality::Aug,
+        ChordQuality::Sus2, ChordQuality::Sus4, ChordQuality::Maj7, ChordQuality::Min7,
+        ChordQuality::Dom7, ChordQuality::Min7b5, ChordQuality::Dim7, ChordQuality::Add9,
+        ChordQuality::Six, ChordQuality::Nine
+    };
+
+    for (auto quality : allQualities)
+    {
+        INFO("quality index " << static_cast<int>(quality));
+        CHECK(chordQualityFromString(toString(quality)) == quality);
+    }
+}
+
+TEST_CASE("chordQualityFromString lancia su un nome sconosciuto", "[ChordDefinition]")
+{
+    CHECK_THROWS_AS(chordQualityFromString("NotAQuality"), std::runtime_error);
+}

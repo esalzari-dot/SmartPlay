@@ -98,6 +98,41 @@ namespace
         }
     }
 
+    // Stesso spirito di userPatternFile(): nei Documenti, non in AppData, perche' un
+    // preset e' contenuto dell'utente (un banco di accordi che ha scelto lui), non
+    // configurazione del plugin.
+    juce::File userChordBankPresetsFile()
+    {
+        return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                 .getChildFile ("SmartChordArp")
+                 .getChildFile ("chordBankPresets.json");
+    }
+
+    // A differenza dei pattern, qui non c'e' un dataset embeddato da cui ripartire: un
+    // file assente o illeggibile significa semplicemente "nessun preset salvato ancora".
+    std::vector<ChordBankPreset> loadChordBankPresets()
+    {
+        const auto file = userChordBankPresetsFile();
+        if (! file.existsAsFile())
+            return {};
+
+        try
+        {
+            return parseChordBankPresets (file.loadFileAsString().toStdString());
+        }
+        catch (const std::exception&)
+        {
+            return {};
+        }
+    }
+
+    void writeChordBankPresets (const std::vector<ChordBankPreset>& presets)
+    {
+        const auto file = userChordBankPresetsFile();
+        file.getParentDirectory().createDirectory();
+        file.replaceWithText (serializeChordBankPresets (presets));
+    }
+
     // Accordi dimostrativi di default (come l'harness standalone), sovrascrivibili
     // dall'utente e comunque persistiti da getStateInformation/setStateInformation.
     ChordBankModule makeDemoChordBank()
@@ -174,6 +209,7 @@ SmartChordAudioProcessor::SmartChordAudioProcessor()
        #endif
       ),
       patternLibrary (loadPatternLibrary()),
+      chordBankPresets (loadChordBankPresets()),
       apvts (*this, nullptr, "PARAMETERS", createParameterLayout()),
       chordBankContent (makeDemoChordBank())
 {
@@ -647,6 +683,54 @@ AutoplayGridState SmartChordAudioProcessor::getGridStateSnapshot() const
 InstrumentFamily SmartChordAudioProcessor::getActiveFamilySnapshot() const
 {
     return static_cast<InstrumentFamily> (readParamAsInt (activeFamilyRaw, 0, 3));
+}
+
+juce::StringArray SmartChordAudioProcessor::getChordBankPresetNames() const
+{
+    juce::StringArray names;
+    for (const auto& preset : chordBankPresets)
+        names.add (preset.name);
+    return names;
+}
+
+bool SmartChordAudioProcessor::findChordBankPreset (const juce::String& name, ChordBankPreset& outPreset) const
+{
+    const auto it = std::find_if (chordBankPresets.begin(), chordBankPresets.end(),
+                                   [&name] (const ChordBankPreset& p) { return p.name == name.toStdString(); });
+
+    if (it == chordBankPresets.end())
+        return false;
+
+    outPreset = *it;
+    return true;
+}
+
+void SmartChordAudioProcessor::saveChordBankPreset (const juce::String& name, const ChordBankModule& bank)
+{
+    const auto preset = presetFromChordBank (name.toStdString(), bank);
+
+    const auto it = std::find_if (chordBankPresets.begin(), chordBankPresets.end(),
+                                   [&preset] (const ChordBankPreset& p) { return p.name == preset.name; });
+
+    if (it != chordBankPresets.end())
+        *it = preset; // stesso nome: sostituisce, non duplica
+    else
+        chordBankPresets.push_back (preset);
+
+    writeChordBankPresets (chordBankPresets);
+}
+
+void SmartChordAudioProcessor::deleteChordBankPreset (const juce::String& name)
+{
+    const auto sizeBefore = chordBankPresets.size();
+
+    chordBankPresets.erase (
+        std::remove_if (chordBankPresets.begin(), chordBankPresets.end(),
+                         [&name] (const ChordBankPreset& p) { return p.name == name.toStdString(); }),
+        chordBankPresets.end());
+
+    if (chordBankPresets.size() != sizeBefore)
+        writeChordBankPresets (chordBankPresets);
 }
 
 void SmartChordAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
