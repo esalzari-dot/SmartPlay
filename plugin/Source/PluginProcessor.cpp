@@ -252,6 +252,10 @@ void SmartChordAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPe
     hasPendingChange = false;
     previousLoopPositionLocal = -1.0;
     loopWrappedLastBlock = false;
+
+   #if ! JucePlugin_IsMidiEffect
+    previewSynth.prepare (sampleRate);
+   #endif
 }
 
 void SmartChordAudioProcessor::releaseResources()
@@ -295,6 +299,12 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear(); // MIDI effect: nessun segnale audio in uscita
+
+   #if ! JucePlugin_IsMidiEffect
+    // Il synth di anteprima suona solo nel vero standalone (vedi PreviewSynth.h): dentro
+    // una DAW SmartChordArpInst resta silenzioso come sempre.
+    const bool renderPreviewAudio = wrapperType == juce::AudioProcessor::wrapperType_Standalone;
+   #endif
 
     const int numSamples = buffer.getNumSamples();
 
@@ -528,6 +538,11 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         for (const auto& off : midiOutputManager.allNotesOff())
             midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
 
+       #if ! JucePlugin_IsMidiEffect
+        if (renderPreviewAudio)
+            previewSynth.renderNextBlock (buffer, midiMessages, 0, numSamples);
+       #endif
+
         return;
     }
 
@@ -563,6 +578,11 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
         midiOutputManager.handleEvent (s.event);
     }
+
+   #if ! JucePlugin_IsMidiEffect
+    if (renderPreviewAudio)
+        previewSynth.renderNextBlock (buffer, midiMessages, 0, numSamples);
+   #endif
 }
 
 juce::AudioProcessorEditor* SmartChordAudioProcessor::createEditor()
