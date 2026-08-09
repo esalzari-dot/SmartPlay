@@ -54,7 +54,7 @@ jobs:
           cmake --build build --target SmartChordArpInst_AU --config Release -j 4
 
       - name: Build Standalone
-        run: cmake --build build --target SmartChordArp_Standalone --config Release -j 4
+        run: cmake --build build --target SmartChordArpInst_Standalone --config Release -j 4
 
       - name: Upload VST3 (MIDI FX)
         uses: actions/upload-artifact@v4
@@ -86,7 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SmartChordArp-Standalone-${{ matrix.platform }}
-          path: build/plugin/SmartChordArp_artefacts/Release/Standalone
+          path: build/plugin/SmartChordArpInst_artefacts/Release/Standalone
 
   release:
     needs: build

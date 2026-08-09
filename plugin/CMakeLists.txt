@@ -80,3 +80,8 @@ juce_add_plugin(SmartChordArpInst
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
 )
 smartchord_configure_plugin(SmartChordArpInst)
+
+# Synth di anteprima (vedi Source/PreviewSynth.h): usato solo dal vero standalone di
+# questa variante, non dalla MIDI FX. Compilarlo solo qui tiene il binario MIDI FX privo
+# di qualunque codice di sintesi, coerente con SPEC.md sezione 1.
+target_sources(SmartChordArpInst PRIVATE Source/PreviewSynth.cpp)

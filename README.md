@@ -17,7 +17,7 @@ Quale file scaricare:
 | **Ableton Live** (qualsiasi edizione) | `SmartChordArp-VST3-Instrument-<piattaforma>.zip` |
 | Cubase, Reaper, Studio One, FL Studio, Bitwig | `SmartChordArp-VST3-MIDIFX-<piattaforma>.zip` |
 | Logic Pro | `SmartChordArp-AU-MIDIFX-macos.zip` |
-| Senza DAW (app autonoma) | `SmartChordArp-Standalone-<piattaforma>.zip` |
+| Senza DAW (app autonoma) | `SmartChordArp-Standalone-<piattaforma>.zip` — include un piano di anteprima incorporato, si sente subito |
 
 Nel dubbio, la variante **Instrument** funziona in tutti gli host: la si carica su una
 traccia MIDI e se ne preleva l'uscita da un'altra traccia. La variante **MIDIFX** è più
@@ -233,15 +233,23 @@ dell'albero sorgente della macchina che lo ha compilato.
 | Target | Formato | Quando serve |
 |---|---|---|
 | `SmartChordArp` | MIDI FX (`isMidiEffect() == true`, nessun bus audio) | La forma corretta da `SPEC.md`: Cubase, Reaper, Studio One, FL Studio, Logic (AU) |
-| `SmartChordArpInst` | Strumento (VSTi, uscita audio silenziosa) | Host che non ospitano i MIDI FX VST3 — **Ableton Live** |
+| `SmartChordArpInst` | Strumento (VSTi, uscita audio silenziosa in una DAW) | Host che non ospitano i MIDI FX VST3 — **Ableton Live** |
 
 In Ableton usa la variante *Inst*: caricala su una traccia MIDI, poi sulla traccia dello
 strumento vero imposta **MIDI From → \<traccia\> → Smart Chord Arpeggiator Inst**.
 
+Il vero standalone (l'app autonoma, non l'harness `SmartChordArpUI` di sviluppo) e' la build
+Standalone di `SmartChordArpInst`: e' l'unica con un bus audio, quindi l'unica che puo' avere
+un dispositivo audio a valle. Contiene un piccolo synth di anteprima incorporato
+(`plugin/Source/PreviewSynth.h`, due sinusoidi con inviluppo ADSR in stile "toy piano") che
+suona **solo** quando il binario gira come vero standalone (`wrapperType ==
+wrapperType_Standalone`): lo stesso identico `.vst3` caricato in una DAW resta silenzioso come
+prima, per non violare il vincolo MIDI-only di `CLAUDE.md`/`SPEC.md` sezione 1 li' dove conta.
+
 ```
 cmake --build build --target SmartChordArp_VST3 -j         # bundle .vst3 (MIDI FX)
 cmake --build build --target SmartChordArpInst_VST3 -j     # bundle .vst3 (strumento)
-cmake --build build --target SmartChordArp_Standalone -j   # eseguibile standalone
+cmake --build build --target SmartChordArpInst_Standalone -j   # eseguibile standalone (con audio)
 ```
 
 I binari finiscono in `build/plugin/SmartChordArp_artefacts/<Debug|Release>/`. Per usare il VST3

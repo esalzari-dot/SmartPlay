@@ -12,6 +12,10 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#if ! JucePlugin_IsMidiEffect
+#include "PreviewSynth.h"
+#endif
+
 #include <array>
 #include <atomic>
 #include <optional>
@@ -212,6 +216,13 @@ private:
     std::mt19937 humanizeRng { 0x5EED };
 
     MidiOutputManager midiOutputManager;
+
+   #if ! JucePlugin_IsMidiEffect
+    // Sente il MIDI generato quando il binario gira come vero standalone (vedi
+    // PreviewSynth.h e processBlock): dentro una DAW SmartChordArpInst resta silenzioso
+    // come prima, per compatibilita' con host come Ableton Live.
+    PreviewSynth previewSynth;
+   #endif
 
     LoopClock loopClock;
     std::vector<NoteEvent> currentLoopEvents;
