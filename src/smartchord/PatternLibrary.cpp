@@ -64,6 +64,7 @@ namespace
         pattern.rhythmGrid = readArrayOr<float> (obj, "rhythmGrid");
         pattern.gateLength = readArrayOr<float> (obj, "gateLength");
         pattern.velocityCurve = readArrayOr<int> (obj, "velocityCurve");
+        pattern.palmMute = readArrayOr<bool> (obj, "palmMute");
 
         pattern.octaveSpread = obj.value ("octaveSpread", 0);
         pattern.loopLength = obj.value ("loopLength", 0);

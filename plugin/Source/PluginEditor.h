@@ -27,10 +27,19 @@ private:
     void pushStateToProcessor();
     void timerCallback() override;
 
+    // Rileva se qualcosa e' cambiato "da fuori" (keyswitch MIDI o automazione host di uno
+    // dei parametri apvts di SPEC.md sezione 8) e riallinea la copia locale usata dalla
+    // UI, cosi' la griglia riflette anche i cambi che non sono passati da un click.
+    bool resyncFromProcessorIfNeeded();
+
     SmartChordAudioProcessor& processorRef;
 
     ChordBankModule chordBank;
     AutoplayGridState gridState;
+    float lastKnownSwing = -1.0f;
+    float lastKnownGate = -1.0f;
+    int lastKnownOctaveRange = 0;
+    PatternRate lastKnownRate = PatternRate::Normal;
 
     // Evita che il riallineamento a una modifica proveniente dal thread audio venga
     // rimandato indietro al processor come se fosse un'interazione dell'utente.

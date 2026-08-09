@@ -5,6 +5,9 @@ namespace smartchord
 
 void MidiOutputManager::handleEvent (const NoteEvent& event)
 {
+    if (event.kind == NoteEvent::Kind::ControlChange)
+        return; // i control change non aprono ne' chiudono note
+
     if (event.kind == NoteEvent::Kind::NoteOn)
     {
         ++activeNoteCounts[event.midiNote];

@@ -41,6 +41,12 @@ struct PatternDefinition
     float swingAmount = 0.0f;            // 0-1
     float strumOffsetMs = 0.0f;          // opzionale, solo chitarra
     StrumDirection strumDirection = StrumDirection::Up;
+
+    // Palm mute per step (chitarra): la nota viene accorciata e suonata piu' piano, come
+    // quando il palmo appoggia sulle corde vicino al ponte. Un array piu' corto di
+    // rhythmGrid vale come "non mutato" per gli step mancanti.
+    std::vector<bool> palmMute;
+
     bool crescendoCurve = false;         // opzionale, solo archi
 };
 

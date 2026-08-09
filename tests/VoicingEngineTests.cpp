@@ -73,11 +73,14 @@ TEST_CASE("voiceChord generates the expected notes per instrument family for a C
         CHECK(result.topNoteIndex == 2);
     }
 
-    SECTION("Strings spread the chord across octaves")
+    SECTION("Strings spread the chord across octaves and double the voices")
     {
+        // Il profilo archi ha allowDoubling: le tre note dell'accordo, spaziate, vengono
+        // raddoppiate all'ottava superiore fin dove la tessitura lo consente (91 + 12
+        // uscirebbe da midiRangeHigh, quindi quella voce resta singola).
         const auto result = voiceChord(cMajor, getVoicingProfile(InstrumentFamily::Strings));
-        CHECK(result.notes == std::vector<int>{60, 76, 91});
-        CHECK(result.topNoteIndex == 2);
+        CHECK(result.notes == std::vector<int>{60, 72, 76, 88, 91});
+        CHECK(result.topNoteIndex == 4);
     }
 }
 
@@ -124,4 +127,46 @@ TEST_CASE("voiceChordWithLeading falls back to the requested inversion without a
     const ChordDefinition chord{0, ChordQuality::Maj, 1, 0};
 
     CHECK(voiceChordWithLeading(chord, profile, {}).notes == voiceChord(chord, profile).notes);
+}
+
+TEST_CASE("allowDoubling riempie le voci mancanti raddoppiando all'ottava", "[VoicingEngine]")
+{
+    VoicingProfile profile{InstrumentFamily::Strings, 36, 96, 6, 1, 0, true, VoicingStyle::Block};
+    const ChordDefinition cMajor{0, ChordQuality::Maj, 0, 0};
+
+    const auto result = voiceChord(cMajor, profile);
+
+    // 60/64/67 raddoppiate all'ottava sopra, in ordine crescente.
+    CHECK(result.notes == std::vector<int>{60, 64, 67, 72, 76, 79});
+    CHECK(result.topNoteIndex == 5);
+}
+
+TEST_CASE("allowDoubling non supera mai maxNotes", "[VoicingEngine]")
+{
+    VoicingProfile profile{InstrumentFamily::Strings, 36, 96, 4, 1, 0, true, VoicingStyle::Block};
+    const ChordDefinition cMajor{0, ChordQuality::Maj, 0, 0};
+
+    const auto result = voiceChord(cMajor, profile);
+
+    CHECK(result.notes == std::vector<int>{60, 64, 67, 72});
+}
+
+TEST_CASE("allowDoubling non esce dalla tessitura dello strumento", "[VoicingEngine]")
+{
+    // midiRangeHigh troppo basso perche' un raddoppio ci stia: il voicing resta com'e'.
+    VoicingProfile profile{InstrumentFamily::Guitar, 60, 70, 6, 1, 0, true, VoicingStyle::Block};
+    const ChordDefinition cMajor{0, ChordQuality::Maj, 0, 0};
+
+    const auto result = voiceChord(cMajor, profile);
+
+    for (int note : result.notes)
+        CHECK(note <= 70);
+}
+
+TEST_CASE("senza allowDoubling il voicing resta alle sole note dell'accordo", "[VoicingEngine]")
+{
+    VoicingProfile profile{InstrumentFamily::Piano, 36, 96, 6, 1, 0, false, VoicingStyle::Block};
+    const ChordDefinition cMajor{0, ChordQuality::Maj, 0, 0};
+
+    CHECK(voiceChord(cMajor, profile).notes == std::vector<int>{60, 64, 67});
 }

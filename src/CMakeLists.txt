@@ -1,11 +1,14 @@
 add_library(smartchord_core STATIC
     smartchord/ChordDefinition.cpp
+    smartchord/ChordRecognizer.cpp
+    smartchord/ChordProgressions.cpp
     smartchord/VoicingEngine.cpp
     smartchord/PatternLibrary.cpp
     smartchord/AutoplayGridState.cpp
     smartchord/ArpeggiatorEngine.cpp
     smartchord/MidiOutputManager.cpp
     smartchord/ChordBankModule.cpp
+    smartchord/LoopClock.cpp
 )
 
 target_include_directories(smartchord_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

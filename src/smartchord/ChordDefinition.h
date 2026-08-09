@@ -34,4 +34,14 @@ struct ChordDefinition
     int octaveOffset = 0;                     // ottava base del voicing
 };
 
+inline bool operator== (const ChordDefinition& a, const ChordDefinition& b)
+{
+    return a.rootSemitone == b.rootSemitone
+        && a.quality == b.quality
+        && a.inversion == b.inversion
+        && a.octaveOffset == b.octaveOffset;
+}
+
+inline bool operator!= (const ChordDefinition& a, const ChordDefinition& b) { return ! (a == b); }
+
 } // namespace smartchord

@@ -9,12 +9,15 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 
 add_executable(smartchord_tests
     ChordDefinitionTests.cpp
+    ChordRecognizerTests.cpp
+    ChordProgressionsTests.cpp
     VoicingEngineTests.cpp
     PatternLibraryTests.cpp
     AutoplayGridStateTests.cpp
     ArpeggiatorEngineTests.cpp
     MidiOutputManagerTests.cpp
     ChordBankModuleTests.cpp
+    LoopClockTests.cpp
 )
 
 target_link_libraries(smartchord_tests PRIVATE smartchord_core Catch2::Catch2WithMain)
