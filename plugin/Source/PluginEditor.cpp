@@ -72,6 +72,22 @@ SmartChordAudioProcessorEditor::SmartChordAudioProcessorEditor (SmartChordAudioP
         processorRef.setHumanizeEnabled (shouldHumanize);
     };
 
+    panel.setPlayModeActive (processor.getPlayModeEnabled());
+    panel.onPlayModeChanged = [this] (bool shouldBeActive)
+    {
+        processorRef.setPlayModeEnabled (shouldBeActive);
+    };
+
+    panel.onPlayStripGesture = [this] (int chordSlot, StripGesturePhase phase, float position)
+    {
+        processorRef.pushStripNotchGesture (chordSlot, phase, position);
+    };
+
+    panel.onPlayStripChordGesture = [this] (int chordSlot, bool down)
+    {
+        processorRef.pushStripChordGesture (chordSlot, down);
+    };
+
     panel.setAvailablePresets (processor.getChordBankPresetNames());
 
     panel.onSavePresetRequested = [this] (const juce::String& name)

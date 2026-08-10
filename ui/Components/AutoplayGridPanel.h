@@ -4,13 +4,16 @@
 #include "ChordPadRow.h"
 #include "FamilySwitcher.h"
 #include "PatternReadout.h"
+#include "PlayStripRow.h"
 
 #include "smartchord/ArpeggiatorEngine.h"
 #include "smartchord/AutoplayGridState.h"
 #include "smartchord/ChordBankModule.h"
 #include "smartchord/ChordProgressions.h"
 #include "smartchord/PatternLibrary.h"
+#include "smartchord/PlayStripEngine.h"
 
+#include <array>
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <functional>
@@ -99,6 +102,24 @@ public:
     std::function<void (const juce::String& name)> onLoadPresetRequested;
     std::function<void (const juce::String& name)> onDeletePresetRequested;
 
+    // Modalita' Play (SPEC.md sezione 5.5): alternativa gestuale all'Autoplay Grid, non la
+    // sostituisce. setPlayModeActive() serve al chiamante per ripristinare lo stato salvato
+    // senza generare a sua volta onPlayModeChanged (stesso pattern di setFreeRun/
+    // setVoiceLeading/ecc.).
+    void setPlayModeActive (bool shouldBeActive);
+    bool getPlayModeActive() const noexcept { return playModeActive; }
+    std::function<void (bool)> onPlayModeChanged;
+
+    // Tocco su una tacca di una barra Play: chordSlot indica quale delle 9, phase/position
+    // sono lo stesso gesto grezzo di PlayStripEngine::processGesture (SPEC.md sezione 5.5).
+    // Il pannello non genera MIDI da solo (non ha accesso al thread audio): il chiamante
+    // (PluginEditor) inoltra il gesto al processor.
+    std::function<void (int chordSlot, StripGesturePhase phase, float position)> onPlayStripGesture;
+
+    // Tocco sul nome dell'accordo di una barra Play: l'accordo completo, basso incluso,
+    // invece di una singola tacca.
+    std::function<void (int chordSlot, bool down)> onPlayStripChordGesture;
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
@@ -147,10 +168,20 @@ private:
 
     void applySelectedProgression();
     void setGlobalControlsVisible (bool shouldBeVisible);
+    void updateModeButtons();
+    void refreshPlayStrips();
     FamilySwitcher familySwitcher;
     ChordPadRow chordPadRow;
     AutoplayGridComponent autoplayGrid;
     PatternReadout patternReadout;
+
+    // Modalita' Play (SPEC.md sezione 5.5): un secondo modo di eseguire l'accordo attivo,
+    // scelto con un piccolo toggle accanto all'etichetta di sezione "Autoplay". false di
+    // default: l'Autoplay Grid resta il comportamento atteso appena aperto il plugin.
+    bool playModeActive = false;
+    juce::TextButton autoplayModeButton { "Autoplay" };
+    juce::TextButton playModeButton { "Play" };
+    std::array<PlayStripRow, numChordBankSlots> playStripRows;
 };
 
 } // namespace smartchord::ui

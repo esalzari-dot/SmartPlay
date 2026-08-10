@@ -121,6 +121,14 @@ rispetto alle build precedenti, solo core + test.
   interruttore la sequenza torna deterministica per quel pattern, ignorando quei campi.
 - **Intensità del pattern**: griglia Autoplay 9×4 — colonna = accordo, riga = intensità
   (dal basso, semplice, verso l'alto, complesso). Un click seleziona entrambe insieme.
+- **Play** (toggle Autoplay/Play, sopra la griglia): una seconda modalità di esecuzione,
+  alternativa al pattern preregistrato — `SPEC.md` §5.5. Al posto della griglia mostra 9
+  barre, una per accordo, ognuna con un numero fisso di tacche (7 pianoforte, 6 chitarra,
+  4 basso/archi) che rappresentano la scala dell'accordo: clic su una tacca suona quella
+  nota tenuta finché premi, clic e trascina suona le tacche attraversate una dopo l'altra
+  (velocity legata alla velocità del trascinamento). Clic sul nome dell'accordo (a
+  sinistra di ogni barra) suona l'accordo intero, basso compreso. Passare a Play ferma il
+  pattern automatico — le due modalità non suonano mai insieme.
 - **Rate** (in alto a destra): moltiplicatore globale sulla velocità del pattern —
   `1/2x`, `1x`, `Terzine`, `2x`. Lo stesso pattern suona a metà, a doppio o in terzine
   senza doverne scrivere una variante.

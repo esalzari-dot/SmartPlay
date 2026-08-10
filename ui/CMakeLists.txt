@@ -9,6 +9,7 @@ target_sources(SmartChordArpUI PRIVATE
     Components/AutoplayGridPanel.cpp
     Components/FamilySwitcher.cpp
     Components/ChordPadRow.cpp
+    Components/PlayStripRow.cpp
     Components/AutoplayGridComponent.cpp
     Components/PatternReadout.cpp
     Components/ChordLabel.cpp

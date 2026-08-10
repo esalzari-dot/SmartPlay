@@ -8,6 +8,7 @@
 #include "smartchord/LoopClock.h"
 #include "smartchord/MidiOutputManager.h"
 #include "smartchord/PatternLibrary.h"
+#include "smartchord/PlayStripEngine.h"
 #include "smartchord/VoicingEngine.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -131,6 +132,21 @@ public:
     void setHumanizeEnabled (bool shouldHumanize) { humanizeEnabled.store (shouldHumanize, std::memory_order_relaxed); }
     bool getHumanizeEnabled() const { return humanizeEnabled.load (std::memory_order_relaxed); }
 
+    // Modalita' Play (SPEC.md sezione 5.5): quando true, processBlock() non genera piu' il
+    // pattern automatico e reagisce solo ai gesti sulla barra (push*Gesture, sotto) - le
+    // due modalita' non suonano mai insieme, come in GarageBand passare da Autoplay a Play
+    // interrompe il pattern automatico. Preferenza d'uso come le altre sopra, non un
+    // parametro apvts.
+    void setPlayModeEnabled (bool shouldEnablePlayMode) { playModeEnabled.store (shouldEnablePlayMode, std::memory_order_relaxed); }
+    bool getPlayModeEnabled() const { return playModeEnabled.load (std::memory_order_relaxed); }
+
+    // Chiamate dal thread messaggi (UI) quando l'utente interagisce con la barra Play per
+    // lo slot dato. Lock-free: accodano l'evento in stripGestureFifo, il thread audio lo
+    // consuma nel prossimo processBlock() (drenato comunque anche a modo Play spento, per
+    // non lasciare eventi rimasti in coda a sorprendere una riattivazione successiva).
+    void pushStripNotchGesture (int chordSlot, StripGesturePhase phase, float position);
+    void pushStripChordGesture (int chordSlot, bool down);
+
     // true (una sola volta) se un keyswitch MIDI ha cambiato lo slot attivo da quando e'
     // stato interrogato l'ultima volta: l'editor lo usa per riallinearsi.
     bool consumeSlotChangedByMidi() { return slotChangedByMidi.exchange (false, std::memory_order_acq_rel); }
@@ -161,6 +177,26 @@ private:
 
     void regenerateAudioThreadLoop (const ChordDefinition& chord, InstrumentFamily family,
                                      int intensityLevel, const SyncClock& clock, int octaveRange);
+
+    // Un gesto sulla barra Play in attesa di essere consumato dal thread audio (SPEC.md
+    // sezione 5.5). isChordGesture distingue il tocco sul nome dell'accordo (accordo
+    // completo, position/phase Move ignorati) da un tocco/trascinamento su una tacca.
+    struct QueuedStripGesture
+    {
+        int chordSlot = 0;
+        bool isChordGesture = false;
+        StripGesturePhase phase = StripGesturePhase::Down;
+        float position = 0.0f;
+        double timestampSeconds = 0.0;
+    };
+
+    void pushStripGesture (const QueuedStripGesture& gesture);
+
+    // Svuota stripGestureFifo. Se playModeActive e' true traduce ogni gesto in MIDI
+    // (tramite handleStripGesture); altrimenti li scarta - evita che gesti rimasti in coda
+    // da quando il modo Play era attivo scattino piu' tardi alla riattivazione.
+    void pumpStripGestures (InstrumentFamily family, juce::MidiBuffer& midiMessages, bool playModeActive);
+    void handleStripGesture (const QueuedStripGesture& gesture, InstrumentFamily family, juce::MidiBuffer& midiMessages);
 
     // Caricata una sola volta nel costruttore, mai modificata dopo: sicura senza lock.
     PatternLibrary patternLibrary;
@@ -204,6 +240,24 @@ private:
     std::atomic<bool> chordFromKeyboard { false };
     std::atomic<bool> quantizeChordSwitch { false };
     std::atomic<bool> humanizeEnabled { true };
+    std::atomic<bool> playModeEnabled { false };
+
+    // Coda lock-free UI -> thread audio per i gesti sulla barra Play (SPEC.md sezione 5.5,
+    // produttore singolo/consumatore singolo: la UI scrive da mouseDown/Drag/Up, solo
+    // processBlock() legge). 256 e' ampiamente sufficiente per i gesti di un utente umano
+    // fra due blocchi audio consecutivi.
+    static constexpr int stripGestureQueueCapacity = 256;
+    juce::AbstractFifo stripGestureFifo { stripGestureQueueCapacity };
+    std::array<QueuedStripGesture, stripGestureQueueCapacity> stripGestureBuffer;
+
+    // Un solo engine (non uno per slot): con un solo mouse puo' esserci al massimo un
+    // gesto in corso alla volta, quindi le sue note vengono impostate di nuovo a ogni
+    // nuovo Down (vedi handleStripGesture). Le note "accese" dalla modalita' Play (sia
+    // dalle tacche sia dal tocco sul nome dell'accordo) sono tracciate a parte da
+    // MidiOutputManager - che segue solo il pattern automatico - per poterle chiudere in
+    // panic se il modo Play si disattiva o il plugin si ferma a meta' gesto.
+    PlayStripEngine playStripEngine;
+    std::vector<int> playStripActiveNotes;
 
     // Note attualmente premute sulla tastiera, sopra la fascia dei keyswitch. Usato solo
     // dal thread audio.

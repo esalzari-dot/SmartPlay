@@ -20,7 +20,8 @@ namespace
     // v6: il banco accordi passa da 8 a 9 slot (tastierino numerico 1-9); aggiunge anche
     //     i flag "switch a tempo" e "humanize attivo". Un file v<=5 ha solo 8 accordi e
     //     8 colonne di intensita' nel mezzo dello stream: legacyChordSlots li isola.
-    constexpr int32_t stateFormatVersion = 6;
+    // v7: aggiunge il flag "modo Play attivo" (SPEC.md sezione 5.5).
+    constexpr int32_t stateFormatVersion = 7;
     constexpr int legacyChordSlots = 8;
 
     juce::String familyParamKey (InstrumentFamily family)
@@ -253,6 +254,17 @@ void SmartChordAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPe
     previousLoopPositionLocal = -1.0;
     loopWrappedLastBlock = false;
 
+    // Scarta eventuali gesti Play rimasti in coda e le note che avevano gia' acceso: un
+    // giro di prepareToPlay (cambio del sample rate, stop/riavvio dell'host) interrompe un
+    // gesto a meta' tanto quanto lo farebbe rilasciare il modo Play (vedi processBlock).
+    playStripActiveNotes.clear();
+    playStripEngine.setNotes ({});
+    {
+        int start1, size1, start2, size2;
+        stripGestureFifo.prepareToRead (stripGestureFifo.getNumReady(), start1, size1, start2, size2);
+        stripGestureFifo.finishedRead (size1 + size2);
+    }
+
    #if ! JucePlugin_IsMidiEffect
     previewSynth.prepare (sampleRate);
    #endif
@@ -293,6 +305,102 @@ void SmartChordAudioProcessor::regenerateAudioThreadLoop (const ChordDefinition&
     std::mt19937* rng = humanizeEnabled.load (std::memory_order_relaxed) ? &humanizeRng : nullptr;
     currentLoopEvents = generateSequence (*pattern, voicing, clock, rng);
     currentLoopLengthBeats = patternLoopLengthBeats (*pattern, clock.rateMultiplier);
+}
+
+void SmartChordAudioProcessor::pushStripGesture (const QueuedStripGesture& gesture)
+{
+    int start1, size1, start2, size2;
+    stripGestureFifo.prepareToWrite (1, start1, size1, start2, size2);
+
+    if (size1 > 0)
+        stripGestureBuffer[static_cast<size_t> (start1)] = gesture;
+    else if (size2 > 0)
+        stripGestureBuffer[static_cast<size_t> (start2)] = gesture;
+    // Coda piena (mai in pratica, 256 voci per un gesto umano fra due blocchi): il gesto
+    // viene silenziosamente scartato invece di bloccare il thread messaggi.
+
+    stripGestureFifo.finishedWrite (size1 + size2);
+}
+
+void SmartChordAudioProcessor::pushStripNotchGesture (int chordSlot, StripGesturePhase phase, float position)
+{
+    pushStripGesture ({ chordSlot, false, phase, position, juce::Time::getMillisecondCounterHiRes() * 0.001 });
+}
+
+void SmartChordAudioProcessor::pushStripChordGesture (int chordSlot, bool down)
+{
+    pushStripGesture ({ chordSlot, true, down ? StripGesturePhase::Down : StripGesturePhase::Up, 0.0f,
+                         juce::Time::getMillisecondCounterHiRes() * 0.001 });
+}
+
+void SmartChordAudioProcessor::pumpStripGestures (InstrumentFamily family, juce::MidiBuffer& midiMessages, bool playModeActive)
+{
+    int start1, size1, start2, size2;
+    stripGestureFifo.prepareToRead (stripGestureFifo.getNumReady(), start1, size1, start2, size2);
+
+    if (playModeActive)
+    {
+        for (int i = 0; i < size1; ++i)
+            handleStripGesture (stripGestureBuffer[static_cast<size_t> (start1 + i)], family, midiMessages);
+        for (int i = 0; i < size2; ++i)
+            handleStripGesture (stripGestureBuffer[static_cast<size_t> (start2 + i)], family, midiMessages);
+    }
+
+    stripGestureFifo.finishedRead (size1 + size2);
+}
+
+void SmartChordAudioProcessor::handleStripGesture (const QueuedStripGesture& gesture, InstrumentFamily family,
+                                                     juce::MidiBuffer& midiMessages)
+{
+    // Il nome dell'accordo suona l'accordo completo (SPEC.md sezione 5.5), lo stesso
+    // voicing usato ovunque altrove nel plugin - non passa da PlayStripEngine, che
+    // conosce solo le singole tacche.
+    if (gesture.isChordGesture)
+    {
+        if (gesture.phase == StripGesturePhase::Down)
+        {
+            const auto chord = audioChordBankContent.getChord (gesture.chordSlot);
+            const auto voicing = voiceChord (chord, getVoicingProfile (family));
+
+            for (int note : voicing.notes)
+            {
+                midiMessages.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (defaultVelocity)), 0);
+                playStripActiveNotes.push_back (note);
+            }
+        }
+        else if (gesture.phase == StripGesturePhase::Up)
+        {
+            for (int note : playStripActiveNotes)
+                midiMessages.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+            playStripActiveNotes.clear();
+        }
+
+        return;
+    }
+
+    // Down imposta le note della barra sull'accordo/famiglia correnti: sicuro anche senza
+    // aspettare un Up esplicito, perche' con un solo mouse non puo' esserci un altro gesto
+    // gia' in corso quando ne arriva uno nuovo.
+    if (gesture.phase == StripGesturePhase::Down)
+    {
+        const auto chord = audioChordBankContent.getChord (gesture.chordSlot);
+        playStripEngine.setNotes (notesForStrip (chord, family));
+    }
+
+    for (const auto& event : playStripEngine.processGesture ({ gesture.phase, gesture.position, gesture.timestampSeconds }))
+    {
+        if (event.kind == StripNoteEvent::Kind::NoteOn)
+        {
+            midiMessages.addEvent (juce::MidiMessage::noteOn (1, event.midiNote, static_cast<juce::uint8> (event.velocity)), 0);
+            playStripActiveNotes.push_back (event.midiNote);
+        }
+        else
+        {
+            midiMessages.addEvent (juce::MidiMessage::noteOff (1, event.midiNote), 0);
+            playStripActiveNotes.erase (std::remove (playStripActiveNotes.begin(), playStripActiveNotes.end(), event.midiNote),
+                                         playStripActiveNotes.end());
+        }
+    }
 }
 
 void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -395,6 +503,35 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
     const auto family = static_cast<InstrumentFamily> (juce::jlimit (0, 3,
         static_cast<int> (std::lround (activeFamilyRaw->load (std::memory_order_relaxed)))));
+
+    const bool playMode = playModeEnabled.load (std::memory_order_relaxed);
+    pumpStripGestures (family, midiMessages, playMode);
+
+    // Modalita' Play (SPEC.md sezione 5.5): quando attiva, niente pattern automatico - il
+    // resto di processBlock() (griglia/ArpeggiatorEngine/loop) non gira affatto, solo i
+    // gesti sulla barra (gia' gestiti sopra da pumpStripGestures) producono MIDI.
+    if (playMode)
+    {
+        loopPositionNormalized.store (0.0f, std::memory_order_relaxed);
+        previousLoopPositionLocal = -1.0;
+
+       #if ! JucePlugin_IsMidiEffect
+        if (renderPreviewAudio)
+            previewSynth.renderNextBlock (buffer, midiMessages, 0, numSamples);
+       #endif
+
+        return;
+    }
+
+    // Il modo Play e' appena stato disattivato (o non lo era mai): eventuali note ancora
+    // accese da un gesto interrotto a meta' (mouse rilasciato fuori dalla finestra, o modo
+    // spento mentre si teneva premuto) vanno chiuse - non arriverebbe mai un Up a farlo.
+    if (! playStripActiveNotes.empty())
+    {
+        for (int note : playStripActiveNotes)
+            midiMessages.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+        playStripActiveNotes.clear();
+    }
 
     // Se e' appena arrivato un keyswitch si usa subito il suo valore: leggere di nuovo
     // l'atomico non sarebbe scorretto (setValueNotifyingHost lo aggiorna in modo
@@ -786,6 +923,7 @@ void SmartChordAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     stream.writeInt (getOctaveRange());
     stream.writeBool (quantizeChordSwitch.load (std::memory_order_relaxed));
     stream.writeBool (humanizeEnabled.load (std::memory_order_relaxed));
+    stream.writeBool (playModeEnabled.load (std::memory_order_relaxed));
 }
 
 void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -851,6 +989,9 @@ void SmartChordAudioProcessor::setStateInformation (const void* data, int sizeIn
         quantizeChordSwitch.store (stream.readBool(), std::memory_order_relaxed);
         humanizeEnabled.store (stream.readBool(), std::memory_order_relaxed);
     }
+
+    if (version >= 7)
+        playModeEnabled.store (stream.readBool(), std::memory_order_relaxed);
 }
 
 } // namespace smartchord

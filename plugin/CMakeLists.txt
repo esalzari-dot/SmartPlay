@@ -18,6 +18,7 @@ set(SMARTCHORD_PLUGIN_SOURCES
     ../ui/Components/AutoplayGridPanel.cpp
     ../ui/Components/FamilySwitcher.cpp
     ../ui/Components/ChordPadRow.cpp
+    ../ui/Components/PlayStripRow.cpp
     ../ui/Components/AutoplayGridComponent.cpp
     ../ui/Components/PatternReadout.cpp
     ../ui/Components/ChordLabel.cpp
