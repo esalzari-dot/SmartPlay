@@ -235,8 +235,15 @@
     width:44px; flex-shrink:0;
     display:flex; align-items:baseline; gap:4px;
     font-family:var(--sans); font-size:13px; font-weight:700; color:var(--text);
+    cursor:pointer; border-radius:5px; padding:2px 4px; margin:-2px -4px;
+    transition:background .1s;
   }
+  .strip-label:hover{background:rgba(255,255,255,0.05);}
   .strip-label .q{font-family:var(--mono); font-size:8.5px; font-weight:400; color:var(--text-dim);}
+  .strip.chord-flash{
+    background:color-mix(in srgb, var(--accent) 22%, var(--panel-inset));
+    box-shadow:inset 0 2px 6px rgba(0,0,0,0.35), 0 0 14px -3px var(--accent);
+  }
   .strip-notches{
     flex:1; height:100%;
     display:flex; align-items:stretch;
@@ -358,7 +365,7 @@
 
     <div id="playView" style="display:none;">
       <div class="strip-stack" id="stripStack"></div>
-      <div class="strip-caption"><span>Tap = nota singola</span><span>Trascina = passaggio legato</span></div>
+      <div class="strip-caption"><span>Nome accordo = accordo completo</span><span>Tacca = nota singola · trascina = legato</span></div>
     </div>
   </div>
 
@@ -376,7 +383,7 @@
   <div class="bottom-space"></div>
 </div>
 
-<div class="note-hint">Modalità <strong>Play</strong>: clic su una tacca = una nota, tenuta finché premi. Clic e trascina lungo la barra = passaggio legato, nota per nota (prova a trascinare avanti e indietro su una barra Archi).</div>
+<div class="note-hint">Modalità <strong>Play</strong>: clic sul nome dell'accordo (a sinistra) = l'accordo completo, basso incluso. Clic su una tacca = una nota della scala dell'accordo, tenuta finché premi. Clic e trascina lungo la barra = passaggio legato, nota per nota. Le tacche sono 7 per il pianoforte, 6 per la chitarra, 4 per basso e archi — prova a cambiare famiglia in alto e guarda la barra ricalcolarsi.</div>
 
 </div>
 
@@ -386,18 +393,54 @@ const chords = [
   {root:'D', q:'min7'}, {root:'E', q:'min'}, {root:'B', q:'dim'}, {root:'C', q:'7'}, {root:'G', q:'7'}
 ];
 
-// Tacche indicative per accordo/famiglia (mockup: un piano.h reale userebbe notesForStrip()).
-const noteNamesByChord = {
-  0: ['C3','E3','G3','C4','E4','G4','C5','E5'],
-  1: ['G2','B2','D3','G3','B3','D4','G4','B4'],
-  2: ['A2','C3','E3','A3','C4','E4','A4'],
-  3: ['F2','A2','C3','F3','A3','C4','F4','A4'],
-  4: ['D3','F3','A3','C4','D4','F4','A4'],
-  5: ['E2','G2','B2','E3','G3','B3','E4'],
-  6: ['B2','D3','F3','B3','D4','F4'],
-  7: ['C3','E3','G3','Bb3','C4','E4','G4'],
-  8: ['G2','B2','D3','F3','G3','B3','D4','F4']
+// Tacche per accordo/famiglia (mockup): numero fisso per famiglia - 7 per il pianoforte
+// (la scala completa dell'accordo), 6 per la chitarra, 4 per basso e archi (come le corde
+// dei rispettivi strumenti reali) - campionate dalla scala implicita dell'accordo lungo
+// tutta la tessitura della famiglia. Un PlayStripEngine reale userebbe notesForStrip().
+const noteLettersSharp = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const rootSemitoneByLetter = {C:0, G:7, A:9, F:5, D:2, E:4, B:11};
+const scaleIntervalsByQuality = {
+  maj:  [0,2,4,5,7,9,11],
+  min:  [0,2,3,5,7,8,10],
+  dim:  [0,1,3,5,6,8,10],
+  min7: [0,2,3,5,7,9,10],
+  '7':  [0,2,4,5,7,9,10]
 };
+const familyNotchCount = {piano:7, guitar:6, bass:4, strings:4};
+const familyMidiRange  = {piano:[36,84], bass:[28,55], guitar:[40,76], strings:[36,96]};
+
+function noteNameForMidi(midi){
+  const pitchClass = ((midi % 12) + 12) % 12;
+  const octave = Math.floor(midi / 12) - 1;
+  return noteLettersSharp[pitchClass] + octave;
+}
+
+function notesForChordFamily(chordIndex, family){
+  const chord = chords[chordIndex];
+  const rootSemitone = rootSemitoneByLetter[chord.root];
+  const intervals = scaleIntervalsByQuality[chord.q] || scaleIntervalsByQuality.maj;
+  const [rangeLow, rangeHigh] = familyMidiRange[family];
+  const notchCount = familyNotchCount[family];
+
+  let allNotes = [];
+  for (let octave = -2; octave <= 9; octave++)
+    for (const interval of intervals) {
+      const midi = 60 + rootSemitone + interval + 12 * octave;
+      if (midi >= rangeLow && midi <= rangeHigh) allNotes.push(midi);
+    }
+  allNotes = [...new Set(allNotes)].sort((a, b) => a - b);
+
+  if (allNotes.length <= notchCount) return allNotes.map(noteNameForMidi);
+
+  // Campiona notchCount valori equidistanti lungo la scala, cosi' un basso a 4 tacche
+  // copre la stessa estensione grave-acuto di un piano a 7, solo con meno fermate.
+  const picked = [];
+  for (let i = 0; i < notchCount; i++) {
+    const idx = Math.round(i * (allNotes.length - 1) / (notchCount - 1));
+    picked.push(allNotes[idx]);
+  }
+  return picked.map(noteNameForMidi);
+}
 
 const families = [
   {id:'piano', label:'Piano'},
@@ -509,19 +552,30 @@ function echoNotch(notchesEl, index){
   setTimeout(()=> el.classList.remove('echo'), 220);
 }
 
+function flashFullChord(strip, label, readout, noteNames){
+  strip.classList.add('chord-flash');
+  readout.textContent = 'tutti';
+  setTimeout(()=>{
+    strip.classList.remove('chord-flash');
+    readout.textContent = '';
+  }, 260);
+}
+
 function renderStripStack(){
   stripStack.innerHTML = '';
   chords.forEach((c, i)=>{
     const strip = document.createElement('div');
     strip.className = 'strip';
 
+    const noteNames = notesForChordFamily(i, activeFamily);
+
     const label = document.createElement('div');
     label.className = 'strip-label';
+    label.title = 'Clic: accordo completo (con basso)';
     label.innerHTML = `${c.root}<span class="q">${c.q}</span>`;
 
     const notchesWrap = document.createElement('div');
     notchesWrap.className = 'strip-notches';
-    const noteNames = noteNamesByChord[i];
     noteNames.forEach(()=>{
       const notch = document.createElement('div');
       notch.className = 'notch';
@@ -530,6 +584,11 @@ function renderStripStack(){
 
     const readout = document.createElement('div');
     readout.className = 'strip-note-readout';
+
+    label.addEventListener('pointerdown', (e)=>{
+      e.stopPropagation();
+      flashFullChord(strip, label, readout, noteNames);
+    });
 
     notchesWrap.addEventListener('pointerdown', (e)=>{
       notchesWrap.setPointerCapture(e.pointerId);
@@ -593,6 +652,7 @@ function renderAll(){
   renderSegmented();
   renderPadGrid();
   renderAutoplayGrid();
+  renderStripStack();
   renderMode();
   renderReadout();
 }
@@ -610,7 +670,6 @@ setInterval(()=>{
 }, 60);
 
 applyAccent();
-renderStripStack();
 renderAll();
 </script>
 
