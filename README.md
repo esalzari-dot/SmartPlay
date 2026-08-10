@@ -1,4 +1,4 @@
-# Smart Chord & Arpeggiator
+# SmartPlay
 
 Plugin MIDI FX (VST3/AU) per DAW desktop, scritto in JUCE (C++), ispirato agli Smart Instrument di GarageBand per iOS.
 
@@ -14,10 +14,10 @@ Quale file scaricare:
 
 | DAW | File |
 |---|---|
-| **Ableton Live** (qualsiasi edizione) | `SmartChordArp-VST3-Instrument-<piattaforma>.zip` |
-| Cubase, Reaper, Studio One, FL Studio, Bitwig | `SmartChordArp-VST3-MIDIFX-<piattaforma>.zip` |
-| Logic Pro | `SmartChordArp-AU-MIDIFX-macos.zip` |
-| Senza DAW (app autonoma) | `SmartChordArp-Standalone-<piattaforma>.zip` — include un piano di anteprima incorporato, si sente subito |
+| **Ableton Live** (qualsiasi edizione) | `SmartPlay-VST3-Instrument-<piattaforma>.zip` |
+| Cubase, Reaper, Studio One, FL Studio, Bitwig | `SmartPlay-VST3-MIDIFX-<piattaforma>.zip` |
+| Logic Pro | `SmartPlay-AU-MIDIFX-macos.zip` |
+| Senza DAW (app autonoma) | `SmartPlay-Standalone-<piattaforma>.zip` — include un piano di anteprima incorporato, si sente subito |
 
 Nel dubbio, la variante **Instrument** funziona in tutti gli host: la si carica su una
 traccia MIDI e se ne preleva l'uscita da un'altra traccia. La variante **MIDIFX** è più
@@ -90,7 +90,7 @@ rispetto alle build precedenti, solo core + test.
   contenuto attuale dei 9 pad con un nome a scelta; il menu **Preset** lo richiama in
   qualunque altro progetto, **Elimina** lo rimuove. A differenza delle progressioni
   incorporate, i preset sono tuoi: salvati in
-  `Documenti/SmartChordArp/chordBankPresets.json`, un JSON leggibile e modificabile a
+  `Documenti/SmartPlay/chordBankPresets.json`, un JSON leggibile e modificabile a
   mano come `patterns.json`.
 - **Cambiare accordo mentre suoni**: manda al plugin una nota MIDI nella fascia dei
   keyswitch, **C1–G#1** (note MIDI 24-32, con C3 = 60): ognuna seleziona uno dei 9 slot.
@@ -150,9 +150,9 @@ I pattern non sono cablati nel codice: il plugin li legge da un file JSON che pu
 modificare, senza ricompilare nulla (`SPEC.md` §5.4). Al primo avvio viene creato con i 16
 pattern di default, e da quel momento ha la precedenza sui pattern embeddati nel binario:
 
-- **Windows**: `Documenti\SmartChordArp\patterns.json`
-- **macOS**: `~/Documents/SmartChordArp/patterns.json`
-- **Linux**: `~/Documents/SmartChordArp/patterns.json`
+- **Windows**: `Documenti\SmartPlay\patterns.json`
+- **macOS**: `~/Documents/SmartPlay/patterns.json`
+- **Linux**: `~/Documents/SmartPlay/patterns.json`
 
 Modifica il file, poi riapri il plugin (o ricarica la sessione) per vedere l'effetto. Se il
 JSON contiene errori il plugin non si rompe: torna silenziosamente ai pattern di default.
@@ -214,7 +214,7 @@ plugin (`/plugin`, stato posseduto da `AudioProcessor`).
 
 ```
 cmake --build build --target SmartChordArpUI -j
-./build/ui/SmartChordArpUI_artefacts/Debug/Smart\ Chord\ \&\ Arpeggiator
+./build/ui/SmartChordArpUI_artefacts/Debug/SmartPlay
 ```
 
 Per disabilitare la build della UI (es. in ambienti senza le librerie di sistema di JUCE:
@@ -244,7 +244,7 @@ dell'albero sorgente della macchina che lo ha compilato.
 | `SmartChordArpInst` | Strumento (VSTi, uscita audio silenziosa in una DAW) | Host che non ospitano i MIDI FX VST3 — **Ableton Live** |
 
 In Ableton usa la variante *Inst*: caricala su una traccia MIDI, poi sulla traccia dello
-strumento vero imposta **MIDI From → \<traccia\> → Smart Chord Arpeggiator Inst**.
+strumento vero imposta **MIDI From → \<traccia\> → SmartPlay Inst**.
 
 Il vero standalone (l'app autonoma, non l'harness `SmartChordArpUI` di sviluppo) e' la build
 Standalone di `SmartChordArpInst`: e' l'unica con un bus audio, quindi l'unica che puo' avere

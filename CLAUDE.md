@@ -1,4 +1,4 @@
-# Istruzioni per Claude Code — Smart Chord & Arpeggiator
+# Istruzioni per Claude Code — SmartPlay
 
 Questo repository contiene lo sviluppo di un plugin **MIDI FX** VST3/AU in JUCE (C++), ispirato agli Smart Instrument di GarageBand. La specifica completa è in `SPEC.md` — **leggila per intero prima di scrivere qualsiasi codice**. I mockup UI di riferimento sono in `docs/`.
 

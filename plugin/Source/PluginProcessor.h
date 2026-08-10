@@ -273,7 +273,7 @@ private:
 
    #if ! JucePlugin_IsMidiEffect
     // Sente il MIDI generato quando il binario gira come vero standalone (vedi
-    // PreviewSynth.h e processBlock): dentro una DAW SmartChordArpInst resta silenzioso
+    // PreviewSynth.h e processBlock): dentro una DAW SmartPlay Inst resta silenzioso
     // come prima, per compatibilita' con host come Ableton Live.
     PreviewSynth previewSynth;
    #endif

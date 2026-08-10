@@ -59,33 +59,33 @@ jobs:
       - name: Upload VST3 (MIDI FX)
         uses: actions/upload-artifact@v4
         with:
-          name: SmartChordArp-VST3-MIDIFX-${{ matrix.platform }}
+          name: SmartPlay-VST3-MIDIFX-${{ matrix.platform }}
           path: build/plugin/SmartChordArp_artefacts/Release/VST3
 
       - name: Upload VST3 (instrument)
         uses: actions/upload-artifact@v4
         with:
-          name: SmartChordArp-VST3-Instrument-${{ matrix.platform }}
+          name: SmartPlay-VST3-Instrument-${{ matrix.platform }}
           path: build/plugin/SmartChordArpInst_artefacts/Release/VST3
 
       - name: Upload AU (macOS only)
         if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: SmartChordArp-AU-MIDIFX-macos
+          name: SmartPlay-AU-MIDIFX-macos
           path: build/plugin/SmartChordArp_artefacts/Release/AU
 
       - name: Upload AU instrument (macOS only)
         if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: SmartChordArp-AU-Instrument-macos
+          name: SmartPlay-AU-Instrument-macos
           path: build/plugin/SmartChordArpInst_artefacts/Release/AU
 
       - name: Upload Standalone
         uses: actions/upload-artifact@v4
         with:
-          name: SmartChordArp-Standalone-${{ matrix.platform }}
+          name: SmartPlay-Standalone-${{ matrix.platform }}
           path: build/plugin/SmartChordArpInst_artefacts/Release/Standalone
 
   release:

@@ -8,7 +8,7 @@ namespace smartchord::ui
 class SmartChordArpApplication : public juce::JUCEApplication
 {
 public:
-    const juce::String getApplicationName() override { return "Smart Chord & Arpeggiator"; }
+    const juce::String getApplicationName() override { return "SmartPlay"; }
     const juce::String getApplicationVersion() override { return "0.1.0"; }
 
     void initialise (const juce::String&) override

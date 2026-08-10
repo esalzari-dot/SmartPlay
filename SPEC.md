@@ -1,4 +1,4 @@
-# Smart Chord & Arpeggiator — Project Spec
+# SmartPlay — Project Spec
 
 ## 1. Panoramica
 

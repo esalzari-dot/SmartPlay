@@ -55,7 +55,7 @@ namespace
     juce::File userPatternFile()
     {
         return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-                 .getChildFile ("SmartChordArp")
+                 .getChildFile ("SmartPlay")
                  .getChildFile ("patterns.json");
     }
 
@@ -105,7 +105,7 @@ namespace
     juce::File userChordBankPresetsFile()
     {
         return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-                 .getChildFile ("SmartChordArp")
+                 .getChildFile ("SmartPlay")
                  .getChildFile ("chordBankPresets.json");
     }
 
@@ -410,7 +410,7 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
    #if ! JucePlugin_IsMidiEffect
     // Il synth di anteprima suona solo nel vero standalone (vedi PreviewSynth.h): dentro
-    // una DAW SmartChordArpInst resta silenzioso come sempre.
+    // una DAW SmartPlay Inst resta silenzioso come sempre.
     const bool renderPreviewAudio = wrapperType == juce::AudioProcessor::wrapperType_Standalone;
    #endif
 

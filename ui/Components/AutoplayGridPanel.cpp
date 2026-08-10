@@ -58,7 +58,7 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     : chordBank (chordBankIn), gridState (gridStateIn), patternLibrary (patternLibraryIn),
       activeFamily (initialFamily)
 {
-    titleLabel.setText ("Smart Chord & Arpeggiator", juce::dontSendNotification);
+    titleLabel.setText ("SmartPlay", juce::dontSendNotification);
     {
         auto titleFont = monoFont (13.0f, juce::Font::bold);
         titleFont.setExtraKerningFactor (0.06f);
