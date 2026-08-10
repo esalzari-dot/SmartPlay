@@ -34,13 +34,14 @@ TEST_CASE("PatternLibrary reference dataset matches SPEC.md sezione 5.3", "[Patt
 {
     const auto library = PatternLibrary::fromJsonFile (dataFilePath ("patterns.json"));
 
-    SECTION("Piano Broken Chord Classic (intensita' 3) ha la velocityCurve attesa")
+    SECTION("Piano Broken Chord Classic (intensita' 3) sale fino all'ottava e ridiscende")
     {
         const auto* pattern = library.findPattern (InstrumentFamily::Piano, 3);
         REQUIRE(pattern != nullptr);
         CHECK(pattern->id == "piano_broken_chord_classic");
-        CHECK(pattern->noteOrderSequence == std::vector<int>{0, 1, 2, 1});
-        CHECK(pattern->velocityCurve == std::vector<int>{100, 75, 85, 75});
+        CHECK(pattern->noteOrderSequence == std::vector<int>{0, 1, 2, 3, 2, 1});
+        CHECK(pattern->velocityCurve == std::vector<int>{100, 74, 82, 96, 82, 74});
+        CHECK(pattern->octaveSpread == 1);
     }
 
     SECTION("Basso Walking Sincopato (intensita' 3) ha lo swing atteso")

@@ -179,6 +179,19 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (voiceLeadingButton);
 
+    // Colore d'allarme distinto dagli altri toggle (che sono tutti preferenze neutre):
+    // Stop e' un panico, deve leggersi diverso a colpo d'occhio.
+    stopButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
+    stopButton.setColour (juce::ToggleButton::tickColourId, Palette::bass);
+    stopButton.setColour (juce::ToggleButton::tickDisabledColourId, Palette::textDim);
+    stopButton.setVisible (false);
+    stopButton.onClick = [this]
+    {
+        if (onOutputMutedChanged != nullptr)
+            onOutputMutedChanged (stopButton.getToggleState());
+    };
+    addChildComponent (stopButton);
+
     rateLabel.setText ("Rate", juce::dontSendNotification);
     rateLabel.setFont (monoFont (11.0f));
     rateLabel.setColour (juce::Label::textColourId, Palette::textDim);
@@ -379,7 +392,13 @@ void AutoplayGridPanel::setFreeRunControlVisible (bool shouldBeVisible)
     rateLabel.setVisible (shouldBeVisible);
     rateBox.setVisible (shouldBeVisible);
     chordFromKeyboardButton.setVisible (shouldBeVisible);
+    stopButton.setVisible (shouldBeVisible);
     setGlobalControlsVisible (shouldBeVisible);
+}
+
+void AutoplayGridPanel::setOutputMuted (bool shouldMute)
+{
+    stopButton.setToggleState (shouldMute, juce::dontSendNotification);
 }
 
 void AutoplayGridPanel::setGlobalControlsVisible (bool shouldBeVisible)
@@ -569,6 +588,8 @@ void AutoplayGridPanel::resized()
     freeRunButton.setBounds (topBar.removeFromRight (185));
     voiceLeadingButton.setBounds (topBar.removeFromRight (120));
     chordFromKeyboardButton.setBounds (topBar.removeFromRight (155));
+    topBar.removeFromRight (14);
+    stopButton.setBounds (topBar.removeFromRight (60));
     titleLabel.setBounds (topBar);
 
     bounds.removeFromTop (16);
