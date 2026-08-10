@@ -32,6 +32,7 @@ PluginProcessor (AudioProcessor, MIDI effect)
 ├── PatternLibrary         → dataset dei pattern di arpeggio, organizzati per famiglia + livello di intensità
 ├── AutoplayGridState      → stato della griglia: per ogni (slot accordo, famiglia) l'intensità selezionata
 ├── ArpeggiatorEngine      → sequencer step-based che applica il PatternDefinition risolto dalla griglia
+├── PlayStripEngine        → modalità gestuale alternativa all'Autoplay, per accordo (sezione 5.5)
 ├── SyncClock              → aggancio al BPM/PPQ dell'host, quantizzazione, swing
 └── MidiOutputManager      → gestisce note-off puliti, panic/all-notes-off al cambio accordo
 ```
@@ -194,6 +195,90 @@ PatternDefinition {
 
 Consiglio: serializzare l'intera `PatternLibrary` come dataset esterno (JSON, o `BinaryData` embeddato in JUCE) per poterla espandere senza ricompilare.
 
+### 5.5 Play Strip (modalità gestuale, alternativa all'Autoplay)
+
+Secondo modo di far suonare un accordo, alternativo — non sostitutivo — all'Autoplay Grid:
+invece di un `PatternDefinition` preregistrato, l'utente suona in tempo reale muovendo il
+puntatore (o il dito, su touch) lungo una barra a "tacche", una per ogni tono dell'accordo.
+Ogni pad accordo espone entrambe le modalità (toggle Autoplay/Play); passare all'una o
+all'altra non cambia l'accordo selezionato, solo come viene eseguito.
+
+**Nota sui riferimenti**: questa modalità replica un *concetto* di interazione (tap = nota
+singola, trascinamento = passaggio legato/arco) osservato negli Smart Instrument di
+GarageBand, ricostruito qui in modo originale — non copia asset, codice o algoritmi Apple
+(vedi `CLAUDE.md`).
+
+```
+StripGesture {
+  phase: enum { Down, Move, Up }
+  position: float           // 0.0-1.0 lungo la barra
+  timestampSeconds: double
+}
+
+StripNoteEvent {
+  kind: enum { NoteOn, NoteOff }
+  midiNote: int
+  velocity: int              // derivata dalla velocità di attraversamento delle tacche
+  timestampSeconds: double
+}
+```
+
+**Numero di tacche per famiglia** (fisso, non dipende da quante note dell'accordo entrano
+nella tessitura):
+
+| Famiglia | Tacche | Perché |
+|---|---|---|
+| Piano | 7 | la scala intera dell'accordo (un'ottava di gradi) |
+| Chitarra | 6 | come le 6 corde dello strumento reale |
+| Basso | 4 | come le 4 corde dello strumento reale |
+| Archi | 4 | come le 4 corde di violino/viola/violoncello/contrabbasso |
+
+**Tacche → note**: le tacche non sono i soli *chord tones* dell'accordo (3-4 note), ma la
+sua **scala implicita** — `getChordScaleTones(quality)`, 7 gradi diatonici che contengono i
+chord tones (per gli accordi diminuiti di settima, simmetrici, li approssima: non esiste
+una scala diatonica di 7 gradi che li contenga esattamente). La scala si estende su più
+ottave entro la tessitura della famiglia (stesso `VoicingProfile` di `VoicingEngine`,
+sezione 4), poi si campiona a un numero di valori equidistanti pari alle tacche della
+tabella sopra: un basso a 4 tacche copre la stessa estensione grave-acuto di un piano a 7,
+solo con meno fermate. `position` si arrotonda all'indice di tacca più vicino:
+`notchIndex = round(position * (numNotches - 1))`.
+
+**Nome dell'accordo → accordo completo**: oltre alle tacche, la barra espone anche
+un'etichetta col nome dell'accordo (es. "Fm"), sempre visibile a un'estremità. Toccarla
+suona l'accordo intero così come lo suonerebbe `VoicingEngine::voiceChord()` (stesso
+voicing usato altrove, basso compreso) invece di una singola nota della scala — è
+un'azione a parte, non passa da `PlayStripEngine`: non tocca lo stato delle tacche
+(nessun `notchIndex` coinvolto), quindi non ha bisogno di un caso speciale nel motore.
+`Down` sull'etichetta suona tutte le note del voicing insieme, `Up` le chiude.
+
+**Regola di articolazione** (unica per tutte le famiglie: cambia solo il *risultato sonoro* a
+valle, non la logica che lo produce — SmartPlay resta MIDI-only, sezione 1: non decide lui
+il timbro, lo decide lo strumento campionato collegato dopo):
+- `Down` seguito da `Up` **senza** attraversare un'altra tacca → una nota sola, tenuta per
+  tutta la durata della pressione (`NoteOn` a `Down`, `NoteOff` a `Up`). Per Archi è
+  pizzicato, per Piano/Chitarra/Basso una nota normale: la differenza timbrica non la fa
+  SmartPlay, la fa il patch campionato a valle (spesso già pensato per decadere da solo su
+  una nota pizzicato, indipendentemente da quanto resta premuta).
+- `Down` con `Move` che attraversa una o più tacche prima di `Up` → ogni attraversamento
+  ritriggera: `NoteOff` sulla tacca precedente + `NoteOn` sulla nuova, per tutta la durata
+  della pressione ("streaming"/arco). La `velocity` di ogni retrigger è derivata dalla
+  velocità di attraversamento (tacche al secondo): gesto più rapido → velocity più alta,
+  entro `[minVelocity, maxVelocity]`.
+- Non c'è una durata "finta" imposta dal motore: `PlayStripEngine` è puramente reattivo agli
+  eventi gesto in ingresso, nessun timer interno. Un'eventuale commutazione d'articolazione
+  esplicita (CC/keyswitch per patch orchestrali che la supportano) resta un'estensione
+  futura, fuori dal perimetro di questa prima versione.
+
+**Differenza da ArpeggiatorEngine**: `PlayStripEngine` non è agganciato a `SyncClock` e non
+schedula nulla in anticipo — reagisce agli eventi gesto man mano che arrivano, è esecuzione
+dal vivo, non un pattern. Va tenuto un modulo separato (testabile isolatamente con sequenze
+sintetiche di `StripGesture`), non un'estensione di `ArpeggiatorEngine`.
+
+**UI**: nuovo componente (`PlayStripComponent` o simile) che sostituisce visivamente il pad
+accordo quando è in modalità Play. Su desktop, senza multitouch: click singolo = `Down`+`Up`
+senza movimento; click e trascina = `Down`→`Move`→`Up`, stesso gesto della barra touch ma
+con il mouse.
+
 ---
 
 ## 6. SyncClock
@@ -231,3 +316,5 @@ Layout della UI (vedi `docs/mockup-v2-garageband-style.html`):
 6. `MidiOutputManager` (panic/note-off al cambio accordo/intensità)
 7. UI: switcher famiglia + 8 pad accordo + griglia Autoplay 8×4 (vedi mockup in `docs/`)
 8. Integrazione VST3/AU wrapper JUCE, test in DAW reale con VST strumento a valle
+9. `PlayStripEngine` (sezione 5.5) + test con sequenze sintetiche di `StripGesture` + UI del
+   toggle Autoplay/Play e della barra a tacche

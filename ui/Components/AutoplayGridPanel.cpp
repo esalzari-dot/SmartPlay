@@ -30,6 +30,14 @@ namespace
         toggle.setColour (juce::ToggleButton::tickDisabledColourId, Palette::textDim);
     }
 
+    // Le due opzioni del toggle Autoplay/Play (SPEC.md sezione 5.5): stessa lettura "in
+    // rilievo quando selezionato" dei pad/segmenti del resto del pannello.
+    void styleModeButton (juce::TextButton& button, bool selected)
+    {
+        button.setColour (juce::TextButton::buttonColourId, selected ? Palette::panelRaisedHi : Palette::panelInset);
+        button.setColour (juce::TextButton::textColourOffId, selected ? Palette::text : Palette::textDim);
+    }
+
     // Etichetta "eyebrow" in stile pannello hardware: mono, tracciata, minuscola nel
     // peso visivo ma maiuscola nel testo - la stessa lettura di un'etichetta serigrafata
     // accanto a una sezione di manopole.
@@ -96,6 +104,49 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
         gridState.setIntensity (activeFamily, chordSlot, intensityLevel);
         refresh();
     };
+
+    autoplayModeButton.onClick = [this]
+    {
+        if (! playModeActive)
+            return;
+
+        setPlayModeActive (false);
+        if (onPlayModeChanged != nullptr)
+            onPlayModeChanged (false);
+    };
+    addAndMakeVisible (autoplayModeButton);
+
+    playModeButton.onClick = [this]
+    {
+        if (playModeActive)
+            return;
+
+        setPlayModeActive (true);
+        if (onPlayModeChanged != nullptr)
+            onPlayModeChanged (true);
+    };
+    addAndMakeVisible (playModeButton);
+    updateModeButtons();
+
+    for (int i = 0; i < numChordBankSlots; ++i)
+    {
+        auto& row = playStripRows[static_cast<size_t> (i)];
+        row.setSlotIndex (i);
+
+        row.onNotchGesture = [this] (int slot, StripGesturePhase phase, float position)
+        {
+            if (onPlayStripGesture != nullptr)
+                onPlayStripGesture (slot, phase, position);
+        };
+
+        row.onChordGesture = [this] (int slot, bool down)
+        {
+            if (onPlayStripChordGesture != nullptr)
+                onPlayStripChordGesture (slot, down);
+        };
+
+        addChildComponent (row); // partono nascoste: updateModeButtons() sopra decide
+    }
 
     for (auto* caption : { &simpleCaptionLabel, &complexCaptionLabel })
     {
@@ -317,7 +368,7 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (humanizeButton);
 
-    setSize (820, 706);
+    setSize (820, 720);
     refresh();
 }
 
@@ -418,6 +469,41 @@ void AutoplayGridPanel::setActiveFamily (InstrumentFamily family)
     familySwitcher.setSelectedFamily (activeFamily);
 }
 
+void AutoplayGridPanel::setPlayModeActive (bool shouldBeActive)
+{
+    playModeActive = shouldBeActive;
+    updateModeButtons();
+    refreshPlayStrips();
+}
+
+void AutoplayGridPanel::updateModeButtons()
+{
+    styleModeButton (autoplayModeButton, ! playModeActive);
+    styleModeButton (playModeButton, playModeActive);
+
+    autoplayGrid.setVisible (! playModeActive);
+    simpleCaptionLabel.setVisible (! playModeActive);
+    complexCaptionLabel.setVisible (! playModeActive);
+
+    for (auto& row : playStripRows)
+        row.setVisible (playModeActive);
+}
+
+void AutoplayGridPanel::refreshPlayStrips()
+{
+    const auto accent = accentColourFor (activeFamily);
+    const int notchCount = notchCountForFamily (activeFamily);
+
+    for (int i = 0; i < numChordBankSlots; ++i)
+    {
+        const auto& chord = chordBank.getChord (i);
+        auto& row = playStripRows[static_cast<size_t> (i)];
+        row.setChordLabel (noteNameFor (chord.rootSemitone), qualityAbbreviationFor (chord.quality));
+        row.setNotchCount (notchCount);
+        row.setAccentColour (accent);
+    }
+}
+
 void AutoplayGridPanel::applySelectedProgression()
 {
     // La voce "-" non e' una progressione: e' lo stato in cui il banco resta com'e'.
@@ -454,6 +540,8 @@ void AutoplayGridPanel::refresh()
     const auto chordLabel = noteNameFor (activeChord.rootSemitone) + " " + qualityAbbreviationFor (activeChord.quality);
 
     patternReadout.setContent (pattern, activeFamily, intensityLevel, chordLabel, accent);
+
+    refreshPlayStrips();
 
     if (onStateChanged != nullptr)
         onStateChanged();
@@ -530,9 +618,30 @@ void AutoplayGridPanel::resized()
     chordPadRow.setBounds (bounds.removeFromTop (56).reduced (20, 0));
 
     bounds.removeFromTop (14);
-    autoplaySectionLabel.setBounds (bounds.removeFromTop (16).reduced (20, 0));
+    auto autoplayLabelRow = bounds.removeFromTop (16).reduced (20, 0);
+    playModeButton.setBounds (autoplayLabelRow.removeFromRight (50));
+    autoplayLabelRow.removeFromRight (3);
+    autoplayModeButton.setBounds (autoplayLabelRow.removeFromRight (76));
+    autoplaySectionLabel.setBounds (autoplayLabelRow);
     bounds.removeFromTop (6);
-    autoplayGrid.setBounds (bounds.removeFromTop (190).reduced (20, 0));
+
+    // Autoplay Grid e barre Play condividono la stessa area riservata (si escludono a
+    // vicenda, mai visibili insieme): dimensionata sulla piu' alta delle due, le 9 barre
+    // impilate, cosi' lo switch fra le due non richiede di ridimensionare la finestra.
+    auto autoplayArea = bounds.removeFromTop (204).reduced (20, 0);
+    autoplayGrid.setBounds (autoplayArea);
+
+    {
+        auto stripsArea = autoplayArea;
+        constexpr int rowGap = 3;
+        const int rowHeight = (stripsArea.getHeight() - rowGap * (static_cast<int> (playStripRows.size()) - 1))
+                             / static_cast<int> (playStripRows.size());
+        for (auto& row : playStripRows)
+        {
+            row.setBounds (stripsArea.removeFromTop (rowHeight));
+            stripsArea.removeFromTop (rowGap);
+        }
+    }
 
     bounds.removeFromTop (5);
     auto captionRow = bounds.removeFromTop (14).reduced (20, 0);
