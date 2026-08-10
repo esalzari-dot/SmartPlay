@@ -16,6 +16,7 @@ add_executable(smartchord_tests
     PatternLibraryTests.cpp
     AutoplayGridStateTests.cpp
     ArpeggiatorEngineTests.cpp
+    PlayStripEngineTests.cpp
     MidiOutputManagerTests.cpp
     ChordBankModuleTests.cpp
     LoopClockTests.cpp

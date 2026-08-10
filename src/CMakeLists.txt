@@ -7,6 +7,7 @@ add_library(smartchord_core STATIC
     smartchord/PatternLibrary.cpp
     smartchord/AutoplayGridState.cpp
     smartchord/ArpeggiatorEngine.cpp
+    smartchord/PlayStripEngine.cpp
     smartchord/MidiOutputManager.cpp
     smartchord/ChordBankModule.cpp
     smartchord/LoopClock.cpp
