@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Smart Chord & Arpeggiator — Play Strip Mockup</title>
+<style>
+  :root{
+    --ink:#17161B;
+    --panel:#211F26;
+    --panel-raised:#2B2831;
+    --panel-raised-hi:#332F39;
+    --panel-inset:#19171D;
+    --seam:#0C0B10;
+    --text:#EDE9E2;
+    --text-muted:#938F9B;
+    --text-dim:#635F6B;
+
+    --piano:#5AA9E6;      --piano-dim:#2E5C82;
+    --bass:#F0794A;       --bass-dim:#8A3F24;
+    --guitar:#4FCC9C;     --guitar-dim:#276B4E;
+    --strings:#A78BFA;    --strings-dim:#5B4A96;
+
+    --accent: var(--guitar);
+    --accent-dim: var(--guitar-dim);
+
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #26232c 0%, transparent 60%),
+      var(--ink);
+    font-family:var(--sans);
+    color:var(--text);
+    padding:48px 20px;
+  }
+
+  .plugin{
+    width:880px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.1) 40%),
+      var(--panel);
+    border-radius:14px;
+    border:1px solid var(--seam);
+    box-shadow:
+      0 40px 90px -20px rgba(0,0,0,0.7),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+    overflow:hidden;
+    position:relative;
+  }
+  .plugin::before{
+    content:'';
+    position:absolute; inset:0; pointer-events:none;
+    opacity:.5;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+  }
+
+  /* ===== NAMEPLATE / HEADER ===== */
+  .nameplate{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 24px;
+    background:var(--seam);
+    border-bottom:1px solid rgba(255,255,255,0.04);
+    position:relative;
+  }
+  .brand{
+    font-family:var(--mono);
+    font-weight:700;
+    letter-spacing:2.5px;
+    font-size:13px;
+    text-transform:uppercase;
+    color:var(--text);
+    display:flex; align-items:baseline; gap:8px;
+  }
+  .brand .amp{color:var(--accent); transition:color .3s;}
+  .brand .sub{
+    font-family:var(--sans); font-weight:400; letter-spacing:0;
+    font-size:11px; color:var(--text-dim); text-transform:none;
+  }
+  .badge-new{
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.5px;
+    color:var(--ink); background:var(--accent);
+    padding:2px 7px; border-radius:999px; font-weight:700;
+  }
+
+  /* ===== SECTION LABEL (hardware panel language) ===== */
+  .section{padding:18px 24px 0 24px;}
+  .section-label-row{
+    display:flex; align-items:center; gap:14px;
+    margin-bottom:10px;
+  }
+  .section-label{
+    font-family:var(--mono);
+    font-size:10px; font-weight:600;
+    letter-spacing:1.8px; text-transform:uppercase;
+    color:var(--text-dim);
+    display:flex; align-items:center; gap:10px;
+    flex:1; min-width:0;
+  }
+  .section-label::after{
+    content:''; flex:1; height:1px;
+    background:linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+  }
+
+  /* ===== FAMILY SWITCHER ===== */
+  .segmented{
+    display:grid; grid-template-columns:repeat(4,1fr);
+    background:var(--panel-inset);
+    border:1px solid rgba(255,255,255,0.05);
+    border-radius:10px; padding:4px; gap:4px;
+  }
+  .segment{
+    text-align:center; padding:10px 0;
+    border-radius:7px;
+    font-family:var(--mono);
+    font-size:11.5px; font-weight:600; letter-spacing:.8px; text-transform:uppercase;
+    color:var(--text-dim);
+    cursor:pointer;
+    transition:all .15s;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+  }
+  .segment .dot{width:6px;height:6px;border-radius:50%; background:currentColor; opacity:.5;}
+  .segment.selected{
+    background:linear-gradient(180deg, var(--panel-raised-hi), var(--panel-raised));
+    color:var(--text);
+    box-shadow:0 1px 0 rgba(255,255,255,0.06) inset, 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .segment.selected .dot{background:var(--accent); opacity:1; box-shadow:0 0 6px var(--accent);}
+
+  /* ===== CHORD BANK — 9 keycap pads ===== */
+  .pad-grid{
+    display:grid; grid-template-columns:repeat(9,1fr);
+    gap:8px;
+  }
+  .pad{
+    aspect-ratio:0.92/1;
+    background:linear-gradient(180deg, var(--panel-raised-hi), var(--panel-raised));
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.05);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 3px 7px rgba(0,0,0,0.35);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; position:relative;
+    transition:transform .12s, box-shadow .12s;
+  }
+  .pad:hover{transform:translateY(-1px);}
+  .pad .slot-num{
+    position:absolute; top:5px; left:7px;
+    font-family:var(--mono); font-size:8.5px; color:rgba(237,233,226,0.22);
+  }
+  .pad .r{font-family:var(--sans); font-size:16px; font-weight:700; color:var(--text);}
+  .pad .q{font-family:var(--mono); font-size:9px; color:var(--text-dim); margin-top:2px; letter-spacing:.4px;}
+  .pad.active{
+    background:linear-gradient(180deg, var(--accent), var(--accent-dim));
+    border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent), 0 0 22px -4px var(--accent), inset 0 1px 0 rgba(255,255,255,0.35);
+  }
+  .pad.active .r{color:var(--ink);}
+  .pad.active .q{color:rgba(23,22,27,0.6);}
+  .pad.active .slot-num{color:rgba(23,22,27,0.35);}
+
+  /* ===== MODE TOGGLE: Autoplay / Play ===== */
+  .mode-toggle{
+    display:flex; gap:3px; flex-shrink:0;
+    background:var(--panel-inset);
+    border:1px solid rgba(255,255,255,0.05);
+    border-radius:8px; padding:3px;
+  }
+  .mode-opt{
+    font-family:var(--mono); font-size:9.5px; font-weight:600;
+    letter-spacing:1px; text-transform:uppercase;
+    padding:5px 11px; border-radius:6px;
+    color:var(--text-dim); cursor:pointer;
+    transition:all .15s;
+  }
+  .mode-opt.selected{
+    background:linear-gradient(180deg, var(--panel-raised-hi), var(--panel-raised));
+    color:var(--text);
+    box-shadow:0 1px 0 rgba(255,255,255,0.06) inset;
+  }
+
+  /* ===== AUTOPLAY GRID — LED matrix ===== */
+  .autoplay-wrap{
+    background:var(--panel-inset);
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.04);
+    box-shadow:inset 0 2px 8px rgba(0,0,0,0.4);
+    padding:9px;
+  }
+  .autoplay-grid{
+    display:grid;
+    grid-template-columns:repeat(9,1fr);
+    grid-template-rows:repeat(4,1fr);
+    gap:4px;
+    height:150px;
+  }
+  .cell{
+    border-radius:3px;
+    background:rgba(255,255,255,0.03);
+    cursor:pointer;
+    transition:background .1s;
+  }
+  .cell:hover{background:rgba(255,255,255,0.07);}
+  .cell.active-col{background:rgba(255,255,255,0.05);}
+  .cell.selected{
+    background:var(--accent);
+    box-shadow:0 0 8px -1px var(--accent);
+  }
+  .intensity-caption{
+    display:flex; justify-content:space-between;
+    margin-top:8px;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.5px; text-transform:uppercase;
+    color:var(--text-dim);
+  }
+
+  /* ===== PLAY STRIP STACK ===== */
+  .strip-stack{
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .strip{
+    display:flex; align-items:center; gap:10px;
+    background:var(--panel-inset);
+    border:1px solid rgba(255,255,255,0.04);
+    border-radius:8px;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,0.35);
+    padding:6px 10px;
+    height:38px;
+  }
+  .strip-label{
+    width:44px; flex-shrink:0;
+    display:flex; align-items:baseline; gap:4px;
+    font-family:var(--sans); font-size:13px; font-weight:700; color:var(--text);
+  }
+  .strip-label .q{font-family:var(--mono); font-size:8.5px; font-weight:400; color:var(--text-dim);}
+  .strip-notches{
+    flex:1; height:100%;
+    display:flex; align-items:stretch;
+    position:relative;
+    cursor:pointer;
+    user-select:none;
+    touch-action:none;
+  }
+  .notch{
+    flex:1;
+    margin:0 1px;
+    border-radius:2px;
+    background:rgba(255,255,255,0.05);
+    transition:background .08s, box-shadow .08s;
+    position:relative;
+  }
+  .notch.lit{
+    background:var(--accent);
+    box-shadow:0 0 10px -1px var(--accent);
+  }
+  .notch.echo{
+    background:rgba(255,255,255,0.14);
+  }
+  .strip-note-readout{
+    width:34px; flex-shrink:0; text-align:right;
+    font-family:var(--mono); font-size:10px; color:var(--text-dim);
+    font-variant-numeric:tabular-nums;
+  }
+  .strip-caption{
+    display:flex; justify-content:space-between;
+    margin-top:8px;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.5px; text-transform:uppercase;
+    color:var(--text-dim);
+  }
+
+  /* ===== READOUT FOOTER ===== */
+  .footer{
+    margin:20px 24px 0 24px;
+    background:var(--seam);
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.04);
+    overflow:hidden;
+  }
+  .footer-main{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:13px 16px;
+  }
+  .footer .name{font-family:var(--sans); font-weight:700; font-size:14px; color:var(--text);}
+  .footer .sub{font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:3px; letter-spacing:.3px;}
+  .footer .route{
+    font-family:var(--mono); font-size:10.5px; font-weight:600;
+    color:var(--accent);
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.06);
+    padding:6px 11px; border-radius:999px;
+    white-space:nowrap;
+  }
+  .playhead-track{
+    height:3px; background:rgba(255,255,255,0.05);
+    position:relative;
+  }
+  .playhead-fill{
+    height:100%; width:38%;
+    background:linear-gradient(90deg, var(--accent-dim), var(--accent));
+    box-shadow:0 0 10px 0 var(--accent);
+    transition:width .1s linear;
+  }
+  .footer.play-mode .playhead-track{opacity:.25;}
+
+  .bottom-space{height:22px;}
+
+  .note-hint{
+    margin-top:14px; text-align:center;
+    font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+    max-width:640px;
+  }
+</style>
+</head>
+<body>
+
+<div style="display:flex; flex-direction:column; align-items:center;">
+
+<div class="plugin">
+
+  <div class="nameplate">
+    <div class="brand">SMART CHORD <span class="amp">&amp;</span> ARPEGGIATOR<span class="sub">v0.6</span></div>
+    <div class="badge-new">nuovo: Play Strip</div>
+  </div>
+
+  <div class="section">
+    <div class="section-label-row">
+      <div class="section-label">Instrument</div>
+    </div>
+    <div class="segmented" id="segmented"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label-row">
+      <div class="section-label">Chord Bank</div>
+    </div>
+    <div class="pad-grid" id="padGrid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label-row">
+      <div class="section-label" id="modeLabel">Autoplay</div>
+      <div class="mode-toggle" id="modeToggle">
+        <div class="mode-opt selected" data-mode="autoplay">Autoplay</div>
+        <div class="mode-opt" data-mode="play">Play</div>
+      </div>
+    </div>
+
+    <div id="autoplayView">
+      <div class="autoplay-wrap">
+        <div class="autoplay-grid" id="autoplayGrid"></div>
+      </div>
+      <div class="intensity-caption"><span>Semplice</span><span>Complesso</span></div>
+    </div>
+
+    <div id="playView" style="display:none;">
+      <div class="strip-stack" id="stripStack"></div>
+      <div class="strip-caption"><span>Tap = nota singola</span><span>Trascina = passaggio legato</span></div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer">
+    <div class="footer-main">
+      <div>
+        <div class="name" id="patternName">Strumming Simulato</div>
+        <div class="sub" id="patternSub">GUITAR · INT 2/4 · G7</div>
+      </div>
+      <div class="route" id="routeLabel">→ VST GUITAR</div>
+    </div>
+    <div class="playhead-track"><div class="playhead-fill" id="playheadFill"></div></div>
+  </div>
+
+  <div class="bottom-space"></div>
+</div>
+
+<div class="note-hint">Modalità <strong>Play</strong>: clic su una tacca = una nota, tenuta finché premi. Clic e trascina lungo la barra = passaggio legato, nota per nota (prova a trascinare avanti e indietro su una barra Archi).</div>
+
+</div>
+
+<script>
+const chords = [
+  {root:'C', q:'maj'}, {root:'G', q:'maj'}, {root:'A', q:'min'}, {root:'F', q:'maj'},
+  {root:'D', q:'min7'}, {root:'E', q:'min'}, {root:'B', q:'dim'}, {root:'C', q:'7'}, {root:'G', q:'7'}
+];
+
+// Tacche indicative per accordo/famiglia (mockup: un piano.h reale userebbe notesForStrip()).
+const noteNamesByChord = {
+  0: ['C3','E3','G3','C4','E4','G4','C5','E5'],
+  1: ['G2','B2','D3','G3','B3','D4','G4','B4'],
+  2: ['A2','C3','E3','A3','C4','E4','A4'],
+  3: ['F2','A2','C3','F3','A3','C4','F4','A4'],
+  4: ['D3','F3','A3','C4','D4','F4','A4'],
+  5: ['E2','G2','B2','E3','G3','B3','E4'],
+  6: ['B2','D3','F3','B3','D4','F4'],
+  7: ['C3','E3','G3','Bb3','C4','E4','G4'],
+  8: ['G2','B2','D3','F3','G3','B3','D4','F4']
+};
+
+const families = [
+  {id:'piano', label:'Piano'},
+  {id:'bass', label:'Bass'},
+  {id:'guitar', label:'Guitar'},
+  {id:'strings', label:'Strings'}
+];
+
+const intensityPatterns = {
+  piano:   ['As Played', 'Up · Down', 'Alberti Bass', 'Broken Chord Classic'],
+  bass:    ['Root Sostenuto', 'Root-Fifth Alternato', 'Walking Pop', 'Walking Sincopato'],
+  guitar:  ['Pad Sostenuto', 'Strumming Simulato', 'Up · Down Picking', 'Travis Picking'],
+  strings: ['Sostenuto Legato', 'Legato Mosso', 'Tremolo Leggero', 'Tremolo Pizzicato']
+};
+
+const instrumentNames = { piano:'VST PIANO', bass:'VST BASS', guitar:'VST GUITAR', strings:'VST STRINGS' };
+
+let activeFamily = 'guitar';
+let activeChord = 8;
+let mode = 'autoplay';
+let intensityByChord = {};
+families.forEach(f=>{ intensityByChord[f.id] = new Array(9).fill(1); });
+
+const segmented = document.getElementById('segmented');
+const padGrid = document.getElementById('padGrid');
+const autoplayGrid = document.getElementById('autoplayGrid');
+const stripStack = document.getElementById('stripStack');
+const patternName = document.getElementById('patternName');
+const patternSub = document.getElementById('patternSub');
+const routeLabel = document.getElementById('routeLabel');
+const modeLabel = document.getElementById('modeLabel');
+const autoplayView = document.getElementById('autoplayView');
+const playView = document.getElementById('playView');
+const footer = document.getElementById('footer');
+const root = document.documentElement;
+
+function applyAccent(){
+  const map = {
+    piano:['--piano','--piano-dim'], bass:['--bass','--bass-dim'],
+    guitar:['--guitar','--guitar-dim'], strings:['--strings','--strings-dim']
+  };
+  const [c, cd] = map[activeFamily];
+  root.style.setProperty('--accent', `var(${c})`);
+  root.style.setProperty('--accent-dim', `var(${cd})`);
+}
+
+function renderSegmented(){
+  segmented.innerHTML = '';
+  families.forEach(f=>{
+    const seg = document.createElement('div');
+    seg.className = 'segment' + (f.id===activeFamily ? ' selected':'');
+    seg.innerHTML = `<span class="dot"></span>${f.label}`;
+    seg.onclick = ()=>{ activeFamily = f.id; applyAccent(); renderAll(); };
+    segmented.appendChild(seg);
+  });
+}
+
+function renderPadGrid(){
+  padGrid.innerHTML = '';
+  chords.forEach((c,i)=>{
+    const pad = document.createElement('div');
+    pad.className = 'pad' + (i===activeChord ? ' active':'');
+    pad.innerHTML = `<span class="slot-num">${i+1}</span><span class="r">${c.root}</span><span class="q">${c.q}</span>`;
+    pad.onclick = ()=>{ activeChord = i; renderAll(); };
+    padGrid.appendChild(pad);
+  });
+}
+
+function renderAutoplayGrid(){
+  autoplayGrid.innerHTML = '';
+  for(let rowVisual=0; rowVisual<4; rowVisual++){
+    const intensity = 3 - rowVisual;
+    for(let col=0; col<9; col++){
+      const cell = document.createElement('div');
+      const isActiveCol = col === activeChord;
+      const isSelected = isActiveCol && intensityByChord[activeFamily][col] === intensity;
+      cell.className = 'cell' + (isActiveCol ? ' active-col':'') + (isSelected ? ' selected':'');
+      cell.onclick = ()=>{
+        activeChord = col;
+        intensityByChord[activeFamily][col] = intensity;
+        renderAll();
+      };
+      autoplayGrid.appendChild(cell);
+    }
+  }
+}
+
+// ===== Play Strip interaction =====
+let dragState = null; // { stripIndex, notchIndex }
+
+function notchIndexFromEvent(e, notchesEl){
+  const rect = notchesEl.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  const n = notchesEl.children.length;
+  return Math.round(ratio * (n - 1));
+}
+
+function setNotchLit(notchesEl, index, on){
+  const el = notchesEl.children[index];
+  if (!el) return;
+  el.classList.toggle('lit', on);
+}
+
+function echoNotch(notchesEl, index){
+  const el = notchesEl.children[index];
+  if (!el) return;
+  el.classList.add('echo');
+  setTimeout(()=> el.classList.remove('echo'), 220);
+}
+
+function renderStripStack(){
+  stripStack.innerHTML = '';
+  chords.forEach((c, i)=>{
+    const strip = document.createElement('div');
+    strip.className = 'strip';
+
+    const label = document.createElement('div');
+    label.className = 'strip-label';
+    label.innerHTML = `${c.root}<span class="q">${c.q}</span>`;
+
+    const notchesWrap = document.createElement('div');
+    notchesWrap.className = 'strip-notches';
+    const noteNames = noteNamesByChord[i];
+    noteNames.forEach(()=>{
+      const notch = document.createElement('div');
+      notch.className = 'notch';
+      notchesWrap.appendChild(notch);
+    });
+
+    const readout = document.createElement('div');
+    readout.className = 'strip-note-readout';
+
+    notchesWrap.addEventListener('pointerdown', (e)=>{
+      notchesWrap.setPointerCapture(e.pointerId);
+      const idx = notchIndexFromEvent(e, notchesWrap);
+      dragState = { stripIndex: i, notchIndex: idx, notchesWrap, readout, noteNames };
+      setNotchLit(notchesWrap, idx, true);
+      readout.textContent = noteNames[idx];
+    });
+
+    notchesWrap.addEventListener('pointermove', (e)=>{
+      if (!dragState || dragState.stripIndex !== i) return;
+      const idx = notchIndexFromEvent(e, notchesWrap);
+      if (idx === dragState.notchIndex) return;
+      setNotchLit(notchesWrap, dragState.notchIndex, false);
+      echoNotch(notchesWrap, dragState.notchIndex);
+      setNotchLit(notchesWrap, idx, true);
+      dragState.notchIndex = idx;
+      readout.textContent = noteNames[idx];
+    });
+
+    const release = (e)=>{
+      if (!dragState || dragState.stripIndex !== i) return;
+      setNotchLit(notchesWrap, dragState.notchIndex, false);
+      dragState = null;
+      readout.textContent = '';
+    };
+    notchesWrap.addEventListener('pointerup', release);
+    notchesWrap.addEventListener('pointercancel', release);
+
+    strip.appendChild(label);
+    strip.appendChild(notchesWrap);
+    strip.appendChild(readout);
+    stripStack.appendChild(strip);
+  });
+}
+
+function renderReadout(){
+  if (mode === 'autoplay'){
+    const level = intensityByChord[activeFamily][activeChord];
+    const name = intensityPatterns[activeFamily][level];
+    patternName.textContent = name;
+    patternSub.textContent = `${families.find(f=>f.id===activeFamily).label.toUpperCase()} · INT ${level+1}/4 · ${chords[activeChord].root}${chords[activeChord].q}`;
+  } else {
+    patternName.textContent = 'Play — esecuzione dal vivo';
+    patternSub.textContent = `${families.find(f=>f.id===activeFamily).label.toUpperCase()} · gesto sulla barra`;
+  }
+  routeLabel.textContent = `→ ${instrumentNames[activeFamily]}`;
+}
+
+function renderMode(){
+  document.querySelectorAll('.mode-opt').forEach(el=>{
+    el.classList.toggle('selected', el.dataset.mode === mode);
+  });
+  modeLabel.textContent = mode === 'autoplay' ? 'Autoplay' : 'Autoplay / Play';
+  autoplayView.style.display = mode === 'autoplay' ? '' : 'none';
+  playView.style.display = mode === 'play' ? '' : 'none';
+  footer.classList.toggle('play-mode', mode === 'play');
+}
+
+function renderAll(){
+  renderSegmented();
+  renderPadGrid();
+  renderAutoplayGrid();
+  renderMode();
+  renderReadout();
+}
+
+document.getElementById('modeToggle').querySelectorAll('.mode-opt').forEach(el=>{
+  el.onclick = ()=>{ mode = el.dataset.mode; renderAll(); };
+});
+
+// playhead animato, solo per mostrare come si muove in Autoplay
+let playPos = 0;
+setInterval(()=>{
+  if (mode !== 'autoplay') return;
+  playPos = (playPos + 1) % 100;
+  document.getElementById('playheadFill').style.width = playPos + '%';
+}, 60);
+
+applyAccent();
+renderStripStack();
+renderAll();
+</script>
+
+</body>
+</html>
