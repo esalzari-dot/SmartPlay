@@ -276,3 +276,28 @@ Per disabilitare la build del plugin, passa `-DSMARTCHORD_BUILD_PLUGIN=OFF` a `c
 - Su Linux, per UI e plugin: librerie di sviluppo X11/ALSA/FreeType/Fontconfig/OpenGL
   (`libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libfreetype-dev libfontconfig1-dev
   libasound2-dev libgl1-mesa-dev libcurl4-openssl-dev`)
+
+## Licenza
+
+SmartPlay è software libero: puoi ridistribuirlo e/o modificarlo secondo i termini della
+**GNU General Public License v3.0** (vedi [`LICENSE`](LICENSE)). In breve: puoi usarlo,
+studiarlo, modificarlo e ridistribuirlo liberamente, anche a scopo commerciale — ma se
+distribuisci una versione modificata, anche quella deve restare sotto GPLv3, sorgente
+incluso.
+
+```
+Copyright (C) 2026 esalzari-dot
+```
+
+SmartPlay non ha alcuna affiliazione con Apple Inc.: è un progetto indipendente ispirato
+alla *categoria* degli Smart Instrument di GarageBand, ricostruito con codice, dataset e
+grafica originali (`CLAUDE.md`, `SPEC.md` sezione 1). "GarageBand" resta un marchio Apple,
+citato qui solo a scopo descrittivo.
+
+### Sviluppo assistito da AI
+
+Il codice di questo repository è stato scritto da [Claude Code](https://claude.ai/code)
+(Anthropic) sotto la direzione, la revisione e l'approvazione dell'autore umano indicato
+sopra, che ha definito la specifica (`SPEC.md`), le decisioni architetturali e di design, e
+approvato ogni funzionalità prima del merge. Lo dichiariamo per trasparenza verso chi userà
+o contribuirà al progetto.
