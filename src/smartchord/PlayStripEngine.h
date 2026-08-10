@@ -28,11 +28,18 @@ struct StripNoteEvent
     double timestampSeconds = 0.0;
 };
 
-// Note della barra per un accordo (SPEC.md sezione 5.5): i chord tones dell'accordo,
-// ripetuti su piu' ottave e filtrati alla tessitura della famiglia data (VoicingEngine
-// sezione 4) - non l'intera scala diatonica, per riusare la conoscenza armonica gia'
-// presente nel progetto invece di introdurre un concetto di scala parallelo. Ordinate dal
-// grave all'acuto: l'indice in questo vettore e' la tacca sulla barra.
+// Numero di tacche della barra per famiglia (SPEC.md sezione 5.5): fisso, non dipende da
+// quante note dell'accordo entrano nella tessitura - il Piano usa la scala intera (7
+// gradi), Chitarra e Basso/Archi replicano il numero di corde dei rispettivi strumenti
+// reali (6 e 4).
+int notchCountForFamily (InstrumentFamily family);
+
+// Note della barra per un accordo (SPEC.md sezione 5.5): la scala implicita dell'accordo
+// (getChordScaleTones), ripetuta su piu' ottave e filtrata alla tessitura della famiglia
+// data (VoicingEngine sezione 4), poi campionata a notchCountForFamily(family) valori
+// equidistanti dal grave all'acuto - cosi' un basso a 4 tacche copre la stessa estensione
+// di un piano a 7, solo con meno fermate. L'indice nel vettore restituito e' la tacca
+// sulla barra.
 std::vector<int> notesForStrip (const ChordDefinition& chord, InstrumentFamily family);
 
 constexpr int stripMinVelocity = 60;

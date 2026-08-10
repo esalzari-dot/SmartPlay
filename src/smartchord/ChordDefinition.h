@@ -27,6 +27,14 @@ enum class ChordQuality
 // Intervalli in semitoni dalla root, per ChordQuality (SPEC.md sezione 3).
 std::vector<int> getChordTones (ChordQuality quality);
 
+// Scala implicita di 7 gradi che contiene i chord tones della qualita' data (per gli
+// accordi diminuiti di settima, simmetrici, li approssima: non esiste una scala diatonica
+// di 7 gradi che li contenga esattamente - vedi ChordDefinition.cpp). Usata da
+// PlayStripEngine (SPEC.md sezione 5.5) per popolare le tacche della barra con note della
+// scala dell'accordo, non solo i suoi toni; non sa nulla della tonalita' del brano, e' solo
+// un ventaglio di note musicalmente coerenti con l'accordo attivo preso da solo.
+std::vector<int> getChordScaleTones (ChordQuality quality);
+
 // Nome stabile per ChordQuality, usato per serializzare (es. ChordBankPresets) - non e'
 // pensato per la UI (ChordLabel ha le sue abbreviazioni), ma per un round-trip esatto.
 const char* toString (ChordQuality quality);

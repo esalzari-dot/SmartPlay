@@ -34,35 +34,41 @@ namespace
     }
 }
 
-TEST_CASE("notesForStrip returns the chord tones spanning the family's tessitura, sorted and deduplicated", "[PlayStripEngine]")
+TEST_CASE("notchCountForFamily returns the fixed notch count per family", "[PlayStripEngine]")
 {
-    const ChordDefinition cMajor{0, ChordQuality::Maj, 0, 0};
-    const auto notes = notesForStrip(cMajor, InstrumentFamily::Piano);
-
-    const auto profile = getVoicingProfile(InstrumentFamily::Piano);
-    REQUIRE(! notes.empty());
-
-    for (int n : notes)
-    {
-        CHECK(n >= profile.midiRangeLow);
-        CHECK(n <= profile.midiRangeHigh);
-        // Deve essere un tono dell'accordo (C maj: 0,4,7 mod 12).
-        const int pitchClass = ((n % 12) + 12) % 12;
-        CHECK((pitchClass == 0 || pitchClass == 4 || pitchClass == 7));
-    }
-
-    CHECK(std::is_sorted(notes.begin(), notes.end()));
-    auto deduped = notes;
-    deduped.erase(std::unique(deduped.begin(), deduped.end()), deduped.end());
-    CHECK(deduped.size() == notes.size());
+    CHECK(notchCountForFamily(InstrumentFamily::Piano) == 7);
+    CHECK(notchCountForFamily(InstrumentFamily::Guitar) == 6);
+    CHECK(notchCountForFamily(InstrumentFamily::Bass) == 4);
+    CHECK(notchCountForFamily(InstrumentFamily::Strings) == 4);
 }
 
-TEST_CASE("notesForStrip covers more than one octave for a wide-range family", "[PlayStripEngine]")
+TEST_CASE("notesForStrip returns notchCountForFamily notes from the chord's scale, sorted and within tessitura", "[PlayStripEngine]")
 {
-    const ChordDefinition aMinor{9, ChordQuality::Min, 0, 0};
-    const auto notes = notesForStrip(aMinor, InstrumentFamily::Strings);
+    const ChordDefinition cMajor{0, ChordQuality::Maj, 0, 0};
 
-    REQUIRE(notes.size() >= 6); // Archi: range ampio, almeno due giri completi dell'accordo
+    for (auto family : { InstrumentFamily::Piano, InstrumentFamily::Guitar,
+                          InstrumentFamily::Bass, InstrumentFamily::Strings })
+    {
+        INFO("family index " << static_cast<int>(family));
+        const auto notes = notesForStrip(cMajor, family);
+        const auto profile = getVoicingProfile(family);
+        const auto scale = getChordScaleTones(ChordQuality::Maj);
+
+        // La tessitura di ciascuna famiglia (VoicingEngine sezione 4) e' ampia abbastanza
+        // da contenere sempre almeno notchCountForFamily note della scala: il campionamento
+        // non deve mai restituire meno tacche del numero fisso previsto.
+        CHECK(notes.size() == static_cast<size_t>(notchCountForFamily(family)));
+
+        for (int n : notes)
+        {
+            CHECK(n >= profile.midiRangeLow);
+            CHECK(n <= profile.midiRangeHigh);
+            const int pitchClass = ((n % 12) + 12) % 12;
+            CHECK(std::find(scale.begin(), scale.end(), pitchClass) != scale.end());
+        }
+
+        CHECK(std::is_sorted(notes.begin(), notes.end()));
+    }
 }
 
 TEST_CASE("PlayStripEngine Down emits a single NoteOn at the tapped notch", "[PlayStripEngine]")

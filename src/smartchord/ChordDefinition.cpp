@@ -28,6 +28,42 @@ std::vector<int> getChordTones (ChordQuality quality)
     return {};
 }
 
+std::vector<int> getChordScaleTones (ChordQuality quality)
+{
+    switch (quality)
+    {
+        case ChordQuality::Maj:
+        case ChordQuality::Sus2:
+        case ChordQuality::Sus4:
+        case ChordQuality::Maj7:
+        case ChordQuality::Add9:
+        case ChordQuality::Six:
+            return { 0, 2, 4, 5, 7, 9, 11 }; // Ionian (maggiore)
+
+        case ChordQuality::Min:
+            return { 0, 2, 3, 5, 7, 8, 10 }; // Aeolian (minore naturale)
+
+        case ChordQuality::Dim:
+        case ChordQuality::Min7b5:
+        case ChordQuality::Dim7: // approssimazione: un accordo diminuito di settima e'
+                                  // simmetrico (0,3,6,9) e non entra esattamente in una
+                                  // scala diatonica di 7 gradi; Locrian e' la piu' vicina.
+            return { 0, 1, 3, 5, 6, 8, 10 }; // Locrian
+
+        case ChordQuality::Aug:
+            return { 0, 2, 4, 5, 8, 9, 11 }; // Ionian con la quinta aumentata
+
+        case ChordQuality::Min7:
+            return { 0, 2, 3, 5, 7, 9, 10 }; // Dorian
+
+        case ChordQuality::Dom7:
+        case ChordQuality::Nine:
+            return { 0, 2, 4, 5, 7, 9, 10 }; // Mixolydian
+    }
+
+    return {};
+}
+
 const char* toString (ChordQuality quality)
 {
     switch (quality)

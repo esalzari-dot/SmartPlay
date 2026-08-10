@@ -6,6 +6,19 @@
 namespace smartchord
 {
 
+int notchCountForFamily (InstrumentFamily family)
+{
+    switch (family)
+    {
+        case InstrumentFamily::Piano:   return 7;
+        case InstrumentFamily::Guitar:  return 6;
+        case InstrumentFamily::Bass:    return 4;
+        case InstrumentFamily::Strings: return 4;
+    }
+
+    return 7;
+}
+
 std::vector<int> notesForStrip (const ChordDefinition& chord, InstrumentFamily family)
 {
     // MIDI 60 (C4) e' la nota di riferimento per octaveOffset == 0, stessa convenzione di
@@ -13,26 +26,39 @@ std::vector<int> notesForStrip (const ChordDefinition& chord, InstrumentFamily f
     constexpr int referenceMiddleC = 60;
 
     const auto profile = getVoicingProfile (family);
-    const auto tones = getChordTones (chord.quality);
-    if (tones.empty())
+    const auto scaleTones = getChordScaleTones (chord.quality);
+    if (scaleTones.empty())
         return {};
 
     const int baseRoot = referenceMiddleC + chord.rootSemitone + 12 * chord.octaveOffset;
 
-    std::vector<int> notes;
+    std::vector<int> allNotes;
     for (int octave = -8; octave <= 8; ++octave)
     {
-        for (int interval : tones)
+        for (int interval : scaleTones)
         {
             const int note = baseRoot + interval + 12 * octave;
             if (note >= profile.midiRangeLow && note <= profile.midiRangeHigh)
-                notes.push_back (note);
+                allNotes.push_back (note);
         }
     }
 
-    std::sort (notes.begin(), notes.end());
-    notes.erase (std::unique (notes.begin(), notes.end()), notes.end());
-    return notes;
+    std::sort (allNotes.begin(), allNotes.end());
+    allNotes.erase (std::unique (allNotes.begin(), allNotes.end()), allNotes.end());
+
+    const int notchCount = notchCountForFamily (family);
+    if (static_cast<int> (allNotes.size()) <= notchCount)
+        return allNotes;
+
+    std::vector<int> picked;
+    picked.reserve (static_cast<size_t> (notchCount));
+    for (int i = 0; i < notchCount; ++i)
+    {
+        const auto idx = static_cast<size_t> (std::lround (
+            i * static_cast<double> (allNotes.size() - 1) / static_cast<double> (notchCount - 1)));
+        picked.push_back (allNotes[idx]);
+    }
+    return picked;
 }
 
 PlayStripEngine::PlayStripEngine (std::vector<int> notesIn)

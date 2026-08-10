@@ -223,11 +223,33 @@ StripNoteEvent {
 }
 ```
 
-**Tacche → note**: la barra ha N tacche, una per ogni tono dell'accordo attivo esteso su più
-ottave — gli stessi *chord tones* già calcolati da `VoicingEngine` (non l'intera scala
-diatonica: scelta deliberata per riusare la conoscenza armonica già presente nel progetto
-invece di introdurre un concetto di "scala" parallelo). `position` si arrotonda all'indice
-di tacca più vicino: `notchIndex = round(position * (numNotes - 1))`.
+**Numero di tacche per famiglia** (fisso, non dipende da quante note dell'accordo entrano
+nella tessitura):
+
+| Famiglia | Tacche | Perché |
+|---|---|---|
+| Piano | 7 | la scala intera dell'accordo (un'ottava di gradi) |
+| Chitarra | 6 | come le 6 corde dello strumento reale |
+| Basso | 4 | come le 4 corde dello strumento reale |
+| Archi | 4 | come le 4 corde di violino/viola/violoncello/contrabbasso |
+
+**Tacche → note**: le tacche non sono i soli *chord tones* dell'accordo (3-4 note), ma la
+sua **scala implicita** — `getChordScaleTones(quality)`, 7 gradi diatonici che contengono i
+chord tones (per gli accordi diminuiti di settima, simmetrici, li approssima: non esiste
+una scala diatonica di 7 gradi che li contenga esattamente). La scala si estende su più
+ottave entro la tessitura della famiglia (stesso `VoicingProfile` di `VoicingEngine`,
+sezione 4), poi si campiona a un numero di valori equidistanti pari alle tacche della
+tabella sopra: un basso a 4 tacche copre la stessa estensione grave-acuto di un piano a 7,
+solo con meno fermate. `position` si arrotonda all'indice di tacca più vicino:
+`notchIndex = round(position * (numNotches - 1))`.
+
+**Nome dell'accordo → accordo completo**: oltre alle tacche, la barra espone anche
+un'etichetta col nome dell'accordo (es. "Fm"), sempre visibile a un'estremità. Toccarla
+suona l'accordo intero così come lo suonerebbe `VoicingEngine::voiceChord()` (stesso
+voicing usato altrove, basso compreso) invece di una singola nota della scala — è
+un'azione a parte, non passa da `PlayStripEngine`: non tocca lo stato delle tacche
+(nessun `notchIndex` coinvolto), quindi non ha bisogno di un caso speciale nel motore.
+`Down` sull'etichetta suona tutte le note del voicing insieme, `Up` le chiude.
 
 **Regola di articolazione** (unica per tutte le famiglie: cambia solo il *risultato sonoro* a
 valle, non la logica che lo produce — SmartPlay resta MIDI-only, sezione 1: non decide lui

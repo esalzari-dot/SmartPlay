@@ -2,6 +2,8 @@
 
 #include "smartchord/ChordDefinition.h"
 
+#include <algorithm>
+
 using namespace smartchord;
 
 TEST_CASE("getChordTones returns correct intervals for triads", "[ChordDefinition]")
@@ -58,4 +60,35 @@ TEST_CASE("toString/chordQualityFromString fanno un round-trip per ogni qualita'
 TEST_CASE("chordQualityFromString lancia su un nome sconosciuto", "[ChordDefinition]")
 {
     CHECK_THROWS_AS(chordQualityFromString("NotAQuality"), std::runtime_error);
+}
+
+TEST_CASE("getChordScaleTones e' una scala di 7 gradi che contiene i chord tones della stessa qualita'", "[ChordDefinition]")
+{
+    const ChordQuality allQualities[] = {
+        ChordQuality::Maj, ChordQuality::Min, ChordQuality::Dim, ChordQuality::Aug,
+        ChordQuality::Sus2, ChordQuality::Sus4, ChordQuality::Maj7, ChordQuality::Min7,
+        ChordQuality::Dom7, ChordQuality::Min7b5, ChordQuality::Dim7, ChordQuality::Add9,
+        ChordQuality::Six, ChordQuality::Nine
+    };
+
+    for (auto quality : allQualities)
+    {
+        INFO("quality index " << static_cast<int>(quality));
+        const auto scale = getChordScaleTones(quality);
+        CHECK(scale.size() == 7);
+
+        for (int tone : getChordTones(quality))
+        {
+            const int pitchClass = ((tone % 12) + 12) % 12;
+
+            // Dim7 e' l'unica approssimazione documentata (SPEC.md sezione 5.5): un
+            // accordo diminuito di settima e' simmetrico e non entra esattamente in una
+            // scala diatonica di 7 gradi.
+            if (quality == ChordQuality::Dim7 && pitchClass == 9)
+                continue;
+
+            INFO("pitch class " << pitchClass);
+            CHECK(std::find(scale.begin(), scale.end(), pitchClass) != scale.end());
+        }
+    }
 }
