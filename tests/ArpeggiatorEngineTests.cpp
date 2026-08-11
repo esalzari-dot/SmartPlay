@@ -167,10 +167,12 @@ TEST_CASE("ArpeggiatorEngine resolves the pattern selected on the grid and rende
 
     const auto events = engine.renderChordLoop(cMajor, InstrumentFamily::Piano, 0);
 
+    // "As Played" (SPEC.md sezione 5.3) e' un accordo tenuto: le tre note partono
+    // insieme, non una dopo l'altra come un lento arpeggio.
     REQUIRE(events.size() == 6);
     CHECK(hasNoteOn(events, 60, 0.0, defaultVelocity));
-    CHECK(hasNoteOn(events, 64, 1.0, defaultVelocity));
-    CHECK(hasNoteOn(events, 67, 2.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 64, 0.0, defaultVelocity));
+    CHECK(hasNoteOn(events, 67, 0.0, defaultVelocity));
 }
 
 TEST_CASE("ArpeggiatorEngine renders a non-empty sequence for all 16 reference patterns", "[ArpeggiatorEngine]")

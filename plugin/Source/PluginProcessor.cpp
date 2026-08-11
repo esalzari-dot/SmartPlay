@@ -55,7 +55,7 @@ namespace
     juce::File userPatternFile()
     {
         return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-                 .getChildFile ("SmartChordArp")
+                 .getChildFile ("SmartPlay")
                  .getChildFile ("patterns.json");
     }
 
@@ -105,7 +105,7 @@ namespace
     juce::File userChordBankPresetsFile()
     {
         return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-                 .getChildFile ("SmartChordArp")
+                 .getChildFile ("SmartPlay")
                  .getChildFile ("chordBankPresets.json");
     }
 
@@ -410,7 +410,7 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
    #if ! JucePlugin_IsMidiEffect
     // Il synth di anteprima suona solo nel vero standalone (vedi PreviewSynth.h): dentro
-    // una DAW SmartChordArpInst resta silenzioso come sempre.
+    // una DAW SmartPlay Inst resta silenzioso come sempre.
     const bool renderPreviewAudio = wrapperType == juce::AudioProcessor::wrapperType_Standalone;
    #endif
 
@@ -504,8 +504,37 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const auto family = static_cast<InstrumentFamily> (juce::jlimit (0, 3,
         static_cast<int> (std::lround (activeFamilyRaw->load (std::memory_order_relaxed)))));
 
-    const bool playMode = playModeEnabled.load (std::memory_order_relaxed);
+    // Panico manuale (SPEC.md - Stop): ha la precedenza su tutto, Autoplay e Play compresi.
+    const bool muted = outputMuted.load (std::memory_order_relaxed);
+    const bool playMode = playModeEnabled.load (std::memory_order_relaxed) && ! muted;
     pumpStripGestures (family, midiMessages, playMode);
+
+    if (muted)
+    {
+        // Chiude sia le note dell'Autoplay (MidiOutputManager le tiene tracciate) sia
+        // quelle di un gesto Play rimasto acceso - le uniche due sorgenti di MIDI in
+        // uscita da questo processor.
+        for (const auto& off : midiOutputManager.allNotesOff())
+            midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
+
+        for (int note : playStripActiveNotes)
+            midiMessages.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+        playStripActiveNotes.clear();
+
+        // havePreviousSelection=false forza una applySelection() pulita alla riattivazione
+        // (SPEC.md sezione 7, stesso meccanismo di un cambio accordo), invece di confrontare
+        // lo stato corrente con uno "congelato" durante il muto.
+        havePreviousSelection = false;
+        loopPositionNormalized.store (0.0f, std::memory_order_relaxed);
+        previousLoopPositionLocal = -1.0;
+
+       #if ! JucePlugin_IsMidiEffect
+        if (renderPreviewAudio)
+            previewSynth.renderNextBlock (buffer, midiMessages, 0, numSamples);
+       #endif
+
+        return;
+    }
 
     // Modalita' Play (SPEC.md sezione 5.5): quando attiva, niente pattern automatico - il
     // resto di processBlock() (griglia/ArpeggiatorEngine/loop) non gira affatto, solo i

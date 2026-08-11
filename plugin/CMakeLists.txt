@@ -49,7 +49,7 @@ endfunction()
 # Variante MIDI FX: quella descritta da SPEC.md sezione 1 (isMidiEffect() == true, nessun
 # bus audio). Supportata da Cubase, Reaper, Studio One, FL Studio, Logic (AU).
 juce_add_plugin(SmartChordArp
-    PRODUCT_NAME "Smart Chord Arpeggiator"
+    PRODUCT_NAME "SmartPlay"
     COMPANY_NAME "SmartPlay"
     BUNDLE_ID "com.smartplay.smartchordarp"
     PLUGIN_MANUFACTURER_CODE Splr
@@ -68,7 +68,7 @@ smartchord_configure_plugin(SmartChordArp)
 # particolare: li' si carica su una traccia MIDI e si preleva il suo MIDI da un'altra
 # traccia con "MIDI From".
 juce_add_plugin(SmartChordArpInst
-    PRODUCT_NAME "Smart Chord Arpeggiator Inst"
+    PRODUCT_NAME "SmartPlay Inst"
     COMPANY_NAME "SmartPlay"
     BUNDLE_ID "com.smartplay.smartchordarpinst"
     PLUGIN_MANUFACTURER_CODE Splr

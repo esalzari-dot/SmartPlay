@@ -67,6 +67,12 @@ public:
     void setChordFromKeyboard (bool shouldRecognize);
     std::function<void (bool)> onChordFromKeyboardChanged;
 
+    // Panico manuale (vedi setFreeRunControlVisible: stesso gruppo, ha senso solo dentro
+    // il plugin): chiude tutte le note in corso e ne sospende la generazione finche' non
+    // lo si disattiva di nuovo, sia in Autoplay sia in Play.
+    void setOutputMuted (bool shouldMute);
+    std::function<void (bool)> onOutputMutedChanged;
+
     // Swing globale (0-1), gate globale (moltiplicatore 0.25-1.5) e range d'ottava
     // (-2..+2): gli ultimi tre automatizzabili di SPEC.md sezione 8, oltre a rate e alla
     // griglia di intensita' gia' esposti altrove nel pannello.
@@ -146,6 +152,7 @@ private:
     juce::ToggleButton freeRunButton { "Suona a trasporto fermo" };
     juce::ToggleButton voiceLeadingButton { "Voice leading" };
     juce::ToggleButton chordFromKeyboardButton { "Accordi da tastiera" };
+    juce::ToggleButton stopButton { "Stop" };
     juce::Label rateLabel;
     juce::ComboBox rateBox;
     juce::Label progressionLabel;

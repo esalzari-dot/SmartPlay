@@ -1,5 +1,5 @@
 juce_add_gui_app(SmartChordArpUI
-    PRODUCT_NAME "Smart Chord & Arpeggiator"
+    PRODUCT_NAME "SmartPlay"
     COMPANY_NAME "SmartPlay"
 )
 
@@ -23,7 +23,7 @@ target_compile_features(SmartChordArpUI PRIVATE cxx_std_17)
 target_compile_definitions(SmartChordArpUI PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
-    JUCE_APPLICATION_NAME_STRING="\"Smart Chord & Arpeggiator\""
+    JUCE_APPLICATION_NAME_STRING="\"SmartPlay\""
     JUCE_APPLICATION_VERSION_STRING="\"0.1.0\""
     SMARTCHORD_DATA_DIR="${CMAKE_SOURCE_DIR}/data"
 )

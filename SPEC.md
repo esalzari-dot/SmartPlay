@@ -1,4 +1,4 @@
-# Smart Chord & Arpeggiator — Project Spec
+# SmartPlay — Project Spec
 
 ## 1. Panoramica
 
@@ -156,36 +156,42 @@ PatternDefinition {
 
 ### 5.3 Le 4 intensità per famiglia (dataset di riferimento)
 
+Ogni pattern ha anche `humanizeTiming`/`humanizeVelocity` (spenti da `Humanize`, sezione 8,
+quando l'utente li disattiva) tranne dove specificato altrimenti; omessi qui sotto per
+brevità. I livelli 0 di ogni famiglia sono un accordo/nota tenuti per un'intera battuta
+(`rhythmGrid:[4.0]`, un solo step) invece di note separate in sequenza — altrimenti
+"sostenuto" scatterebbe come un lento arpeggio a tre note anziché un accordo vero.
+
 **Piano** (0→3): As Played · Up-Down · Alberti Bass · Broken Chord Classic
 ```
-0 As Played:            noteOrderSequence:[0,1,2], rhythmGrid:[1.0,1.0,1.0], gateLength:[0.95]*3
+0 As Played:            noteOrderSequence:[0,1,2], rhythmGrid:[4.0], gateLength:[0.97] (accordo tenuto per battuta)
 1 Up · Down:             noteOrderSequence:[0,1,2,1], rhythmGrid:[0.5]*4, gateLength:[0.85]*4
-2 Alberti Bass:          noteOrderSequence:[0,2,1,2], rhythmGrid:[0.25]*4, gateLength:[0.9]*4
-3 Broken Chord Classic:  noteOrderSequence:[0,1,2,1], rhythmGrid:[0.25]*4, gateLength:[0.9]*4, velocityCurve:[100,75,85,75]
+2 Alberti Bass:          noteOrderSequence:[0,2,1,2], rhythmGrid:[0.25]*4, gateLength:[0.9]*4, swingAmount:0.05
+3 Broken Chord Classic:  noteOrderSequence:[0,1,2,3,2,1], rhythmGrid:[0.25]*6, gateLength:[0.85]*6, octaveSpread:1, loopLength:2 (sale fino all'ottava e ridiscende)
 ```
 
 **Basso** (0→3): Root Sostenuto · Root-Fifth Alternato · Walking Pop · Walking Sincopato
 ```
-0 Root Sostenuto:        noteOrderSequence:[0], rhythmGrid:[1.0], gateLength:[0.9]
+0 Root Sostenuto:        noteOrderSequence:[0], rhythmGrid:[4.0], gateLength:[0.95] (root tenuta per battuta)
 1 Root-Fifth Alternato:  noteOrderSequence:[0,2], rhythmGrid:[0.5,0.5], gateLength:[0.85,0.85]
-2 Walking Pop:           noteOrderSequence:[0,0,2,-1], rhythmGrid:[0.5,0.25,0.25,0.5], gateLength:[0.7,0.5,0.5,0.7]
+2 Walking Pop:           noteOrderSequence:[0,0,null,-1], rhythmGrid:[0.5,0.25,0.25,0.5], gateLength:[0.7,0.5,0.5,0.7]
 3 Walking Sincopato:     noteOrderSequence:[0,2,0,-1,2], rhythmGrid:[0.375,0.125,0.25,0.125,0.125], swingAmount:0.15
 ```
 
 **Chitarra** (0→3): Pad Sostenuto · Strumming Simulato · Up-Down Picking · Travis Picking
 ```
-0 Pad Sostenuto:         noteOrderSequence:[0,1,2,3], rhythmGrid:[1.0], strumOffsetMs:4, gateLength:[1.0]
-1 Strumming Simulato:    noteOrderSequence:[0,1,2,3], rhythmGrid:[1.0], strumOffsetMs:8, gateLength:[0.95], humanizeTiming:3
-2 Up · Down Picking:     noteOrderSequence:[0,1,2,3,2,1], rhythmGrid:[0.25]*6, gateLength:[0.7]*6
-3 Travis Picking:        noteOrderSequence:[0,2,1,2,0,2,1,2], rhythmGrid:[0.25]*8, gateLength:[0.6]*8, swingAmount:0.1
+0 Pad Sostenuto:         noteOrderSequence:[0,1,2,3], rhythmGrid:[4.0], strumOffsetMs:4, gateLength:[0.95] (accordo tenuto per battuta)
+1 Strumming Simulato:    noteOrderSequence:[0,1,2,3], rhythmGrid:[1.0], strumOffsetMs:8, gateLength:[0.92], strumDirection:alternate
+2 Up · Down Picking:     noteOrderSequence:[0,1,2,3,2,1], rhythmGrid:[0.25]*6, gateLength:[0.7]*6, palmMute alternato, swingAmount:0.08
+3 Travis Picking:        noteOrderSequence:[0,2,1,2,0,2,1,2], rhythmGrid:[0.25]*8, gateLength:[0.6]*8, swingAmount:0.1, loopLength:2
 ```
 
 **Archi** (0→3): Sostenuto Legato · Legato Mosso · Tremolo Leggero · Tremolo Pizzicato
 ```
-0 Sostenuto Legato:      noteOrderSequence:[0,1,2], rhythmGrid:[1.0,1.0,1.0], gateLength:[1.0]*3, crescendoCurve:true
+0 Sostenuto Legato:      noteOrderSequence:[0,1,2], rhythmGrid:[4.0], gateLength:[1.0], crescendoCurve:true (accordo tenuto per battuta, con swell)
 1 Legato Mosso:          noteOrderSequence:[0,1,2,1], rhythmGrid:[0.5]*4, gateLength:[0.95]*4
-2 Tremolo Leggero:       noteOrderSequence:[0,0], rhythmGrid:[0.25,0.25], gateLength:[0.5,0.5]
-3 Tremolo Pizzicato:     noteOrderSequence:[0,0,0,0], rhythmGrid:[0.125]*4, gateLength:[0.3]*4, humanizeVelocity:8
+2 Tremolo Leggero:       noteOrderSequence:[0,1,2,1], rhythmGrid:[0.125]*4, gateLength:[0.45]*4 (attraversa l'accordo, non solo la root)
+3 Tremolo Pizzicato:     noteOrderSequence:[0,2,1,2], rhythmGrid:[0.125]*4, gateLength:[0.25]*4, octaveSpread:1, humanizeVelocity:8 (idem)
 ```
 
 ### 5.4 ArpeggiatorEngine

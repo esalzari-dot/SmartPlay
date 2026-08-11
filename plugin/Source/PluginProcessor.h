@@ -140,6 +140,15 @@ public:
     void setPlayModeEnabled (bool shouldEnablePlayMode) { playModeEnabled.store (shouldEnablePlayMode, std::memory_order_relaxed); }
     bool getPlayModeEnabled() const { return playModeEnabled.load (std::memory_order_relaxed); }
 
+    // Panico manuale: quando true, processBlock() chiude subito tutte le note in corso
+    // (sia quelle dell'Autoplay sia quelle della modalita' Play) e non ne genera di nuove,
+    // in qualunque modalita' - ha la precedenza su tutto il resto. Non e' uno stato di
+    // sessione da ricordare al riavvio (a differenza degli altri flag sopra): resta sempre
+    // false all'apertura del plugin, cosi' un progetto salvato "muto per sbaglio" non
+    // sorprende mai riaprendolo.
+    void setOutputMuted (bool shouldMute) { outputMuted.store (shouldMute, std::memory_order_relaxed); }
+    bool getOutputMuted() const { return outputMuted.load (std::memory_order_relaxed); }
+
     // Chiamate dal thread messaggi (UI) quando l'utente interagisce con la barra Play per
     // lo slot dato. Lock-free: accodano l'evento in stripGestureFifo, il thread audio lo
     // consuma nel prossimo processBlock() (drenato comunque anche a modo Play spento, per
@@ -241,6 +250,7 @@ private:
     std::atomic<bool> quantizeChordSwitch { false };
     std::atomic<bool> humanizeEnabled { true };
     std::atomic<bool> playModeEnabled { false };
+    std::atomic<bool> outputMuted { false };
 
     // Coda lock-free UI -> thread audio per i gesti sulla barra Play (SPEC.md sezione 5.5,
     // produttore singolo/consumatore singolo: la UI scrive da mouseDown/Drag/Up, solo
@@ -273,7 +283,7 @@ private:
 
    #if ! JucePlugin_IsMidiEffect
     // Sente il MIDI generato quando il binario gira come vero standalone (vedi
-    // PreviewSynth.h e processBlock): dentro una DAW SmartChordArpInst resta silenzioso
+    // PreviewSynth.h e processBlock): dentro una DAW SmartPlay Inst resta silenzioso
     // come prima, per compatibilita' con host come Ableton Live.
     PreviewSynth previewSynth;
    #endif

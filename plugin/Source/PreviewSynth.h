@@ -10,7 +10,7 @@ namespace smartchord
 // un inviluppo ADSR con decadimento anche a nota tenuta, in stile "toy piano". Non e'
 // pensata per un uso musicale serio, solo per provare accordi e pattern - percio' resta
 // un dettaglio del plugin, non del motore MIDI-only del core (SPEC.md sezione 1): esiste
-// solo nella variante SmartChordArpInst, e anche li' viene usata solo quando gira come
+// solo nella variante SmartPlay Inst, e anche li' viene usata solo quando gira come
 // vero standalone (vedi PluginProcessor::processBlock), mai quando e' ospitata da una DAW.
 class PreviewPianoSound : public juce::SynthesiserSound
 {
