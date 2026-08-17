@@ -280,10 +280,15 @@ schedula nulla in anticipo — reagisce agli eventi gesto man mano che arrivano,
 dal vivo, non un pattern. Va tenuto un modulo separato (testabile isolatamente con sequenze
 sintetiche di `StripGesture`), non un'estensione di `ArpeggiatorEngine`.
 
-**UI**: nuovo componente (`PlayStripComponent` o simile) che sostituisce visivamente il pad
-accordo quando è in modalità Play. Su desktop, senza multitouch: click singolo = `Down`+`Up`
-senza movimento; click e trascina = `Down`→`Move`→`Up`, stesso gesto della barra touch ma
-con il mouse.
+**UI**: `PlayStripRow` — una sola barra **verticale**, non una per accordo (come in
+GarageBand): rappresenta l'accordo attualmente attivo (il pad selezionato nella riga sopra,
+"Chord Bank"), con le tacche impilate dal basso (grave) verso l'alto (acuto), come un manico
+o una tastiera visti di fronte — non una riga letta da sinistra a destra. Selezionare un
+altro pad sopra cambia l'accordo rappresentato dalla barra, sia in Autoplay sia in Play;
+sostituisce visivamente l'Autoplay Grid quando la modalità è Play, nella stessa area
+riservata del pannello. Su desktop, senza multitouch: click singolo = `Down`+`Up` senza
+movimento; click e trascina (in verticale) = `Down`→`Move`→`Up`, stesso gesto della barra
+touch ma con il mouse, posizione 0 in basso e 1 in alto invece che 0 a sinistra e 1 a destra.
 
 ---
 

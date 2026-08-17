@@ -172,7 +172,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SmartChordAudioProcessor::cr
 
     params.push_back (std::make_unique<AudioParameterChoice> (
         ParameterID { "activeChordSlot", 1 }, "Accordo attivo",
-        StringArray { "1", "2", "3", "4", "5", "6", "7", "8" }, 0));
+        StringArray { "1", "2", "3", "4", "5", "6", "7", "8", "9" }, 0));
 
     params.push_back (std::make_unique<AudioParameterChoice> (
         ParameterID { "rate", 1 }, "Rate",
@@ -504,16 +504,13 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const auto family = static_cast<InstrumentFamily> (juce::jlimit (0, 3,
         static_cast<int> (std::lround (activeFamilyRaw->load (std::memory_order_relaxed)))));
 
-    // Panico manuale (SPEC.md - Stop): ha la precedenza su tutto, Autoplay e Play compresi.
-    const bool muted = outputMuted.load (std::memory_order_relaxed);
-    const bool playMode = playModeEnabled.load (std::memory_order_relaxed) && ! muted;
-    pumpStripGestures (family, midiMessages, playMode);
-
-    if (muted)
+    // Panico manuale (SPEC.md - Stop): un click chiude subito tutto cio' che sta suonando
+    // - Autoplay e Play, qualunque sia la modalita' attiva - poi la riproduzione riprende
+    // normale nello stesso blocco, non resta muta finche' qualcuno non lo riattiva. E'
+    // un'azione istantanea (exchange riporta il flag a false appena letto), non uno stato
+    // da riflettere sulla UI.
+    if (panicRequested.exchange (false, std::memory_order_acq_rel))
     {
-        // Chiude sia le note dell'Autoplay (MidiOutputManager le tiene tracciate) sia
-        // quelle di un gesto Play rimasto acceso - le uniche due sorgenti di MIDI in
-        // uscita da questo processor.
         for (const auto& off : midiOutputManager.allNotesOff())
             midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
 
@@ -521,26 +518,31 @@ void SmartChordAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             midiMessages.addEvent (juce::MidiMessage::noteOff (1, note), 0);
         playStripActiveNotes.clear();
 
-        // havePreviousSelection=false forza una applySelection() pulita alla riattivazione
-        // (SPEC.md sezione 7, stesso meccanismo di un cambio accordo), invece di confrontare
-        // lo stato corrente con uno "congelato" durante il muto.
+        // Forza una applySelection() pulita subito dopo (SPEC.md sezione 7, stesso
+        // meccanismo di un cambio accordo) invece di confrontare lo stato corrente con
+        // quello di prima del panico, che potrebbe combaciare per caso e non riapplicare
+        // nulla.
         havePreviousSelection = false;
-        loopPositionNormalized.store (0.0f, std::memory_order_relaxed);
-        previousLoopPositionLocal = -1.0;
-
-       #if ! JucePlugin_IsMidiEffect
-        if (renderPreviewAudio)
-            previewSynth.renderNextBlock (buffer, midiMessages, 0, numSamples);
-       #endif
-
-        return;
     }
+
+    const bool playMode = playModeEnabled.load (std::memory_order_relaxed);
+    pumpStripGestures (family, midiMessages, playMode);
 
     // Modalita' Play (SPEC.md sezione 5.5): quando attiva, niente pattern automatico - il
     // resto di processBlock() (griglia/ArpeggiatorEngine/loop) non gira affatto, solo i
     // gesti sulla barra (gia' gestiti sopra da pumpStripGestures) producono MIDI.
     if (playMode)
     {
+        // Se si e' appena entrati in Play mentre l'Autoplay aveva ancora una nota in corso
+        // (probabile ora che i pattern piu' semplici tengono un accordo per un'intera
+        // battuta), quella nota non riceverebbe mai il suo NoteOff naturale - lo scheduling
+        // dell'Autoplay si ferma del tutto qui sotto, senza mai raggiungere il beat in cui
+        // sarebbe caduto. Va chiusa esplicitamente, altrimenti resta appesa finche' non si
+        // torna in Autoplay e cambia qualcosa (SPEC.md sezione 7).
+        for (const auto& off : midiOutputManager.allNotesOff())
+            midiMessages.addEvent (juce::MidiMessage::noteOff (1, off.midiNote), 0);
+
+        havePreviousSelection = false;
         loopPositionNormalized.store (0.0f, std::memory_order_relaxed);
         previousLoopPositionLocal = -1.0;
 
