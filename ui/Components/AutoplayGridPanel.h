@@ -67,11 +67,10 @@ public:
     void setChordFromKeyboard (bool shouldRecognize);
     std::function<void (bool)> onChordFromKeyboardChanged;
 
-    // Panico manuale (vedi setFreeRunControlVisible: stesso gruppo, ha senso solo dentro
-    // il plugin): chiude tutte le note in corso e ne sospende la generazione finche' non
-    // lo si disattiva di nuovo, sia in Autoplay sia in Play.
-    void setOutputMuted (bool shouldMute);
-    std::function<void (bool)> onOutputMutedChanged;
+    // Panico manuale (MIDI panic, vedi setFreeRunControlVisible: stesso gruppo, ha senso
+    // solo dentro il plugin): un click, non un interruttore - chiude tutte le note in
+    // corso (Autoplay e Play) e la riproduzione riprende subito pulita, non resta muta.
+    std::function<void()> onStopRequested;
 
     // Swing globale (0-1), gate globale (moltiplicatore 0.25-1.5) e range d'ottava
     // (-2..+2): gli ultimi tre automatizzabili di SPEC.md sezione 8, oltre a rate e alla
@@ -152,7 +151,7 @@ private:
     juce::ToggleButton freeRunButton { "Suona a trasporto fermo" };
     juce::ToggleButton voiceLeadingButton { "Voice leading" };
     juce::ToggleButton chordFromKeyboardButton { "Accordi da tastiera" };
-    juce::ToggleButton stopButton { "Stop" };
+    juce::TextButton stopButton { "Stop" };
     juce::Label rateLabel;
     juce::ComboBox rateBox;
     juce::Label progressionLabel;
@@ -188,6 +187,10 @@ private:
     bool playModeActive = false;
     juce::TextButton autoplayModeButton { "Autoplay" };
     juce::TextButton playModeButton { "Play" };
+    // Una colonna verticale per accordo, affiancate come una griglia: tutti e 9 restano
+    // suonabili senza dover riselezionare il pad sopra (a differenza della vista
+    // "un accordo alla volta" di GarageBand) - grave in basso, acuto in alto in ciascuna,
+    // vedi PlayStripRow.h.
     std::array<PlayStripRow, numChordBankSlots> playStripRows;
 };
 

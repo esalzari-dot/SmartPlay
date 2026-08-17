@@ -179,16 +179,16 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     };
     addChildComponent (voiceLeadingButton);
 
-    // Colore d'allarme distinto dagli altri toggle (che sono tutti preferenze neutre):
-    // Stop e' un panico, deve leggersi diverso a colpo d'occhio.
-    stopButton.setColour (juce::ToggleButton::textColourId, Palette::textMuted);
-    stopButton.setColour (juce::ToggleButton::tickColourId, Palette::bass);
-    stopButton.setColour (juce::ToggleButton::tickDisabledColourId, Palette::textDim);
+    // Colore d'allarme distinto dagli altri controlli (che sono tutti preferenze neutre):
+    // Stop e' un panico, deve leggersi diverso a colpo d'occhio. Pulsante normale, non un
+    // interruttore: e' un'azione istantanea (MIDI panic), non uno stato da ricordare.
+    stopButton.setColour (juce::TextButton::buttonColourId, Palette::bass.withAlpha (0.18f));
+    stopButton.setColour (juce::TextButton::textColourOffId, Palette::bass);
     stopButton.setVisible (false);
     stopButton.onClick = [this]
     {
-        if (onOutputMutedChanged != nullptr)
-            onOutputMutedChanged (stopButton.getToggleState());
+        if (onStopRequested != nullptr)
+            onStopRequested();
     };
     addChildComponent (stopButton);
 
@@ -396,11 +396,6 @@ void AutoplayGridPanel::setFreeRunControlVisible (bool shouldBeVisible)
     setGlobalControlsVisible (shouldBeVisible);
 }
 
-void AutoplayGridPanel::setOutputMuted (bool shouldMute)
-{
-    stopButton.setToggleState (shouldMute, juce::dontSendNotification);
-}
-
 void AutoplayGridPanel::setGlobalControlsVisible (bool shouldBeVisible)
 {
     performanceSectionLabel.setVisible (shouldBeVisible);
@@ -510,6 +505,8 @@ void AutoplayGridPanel::updateModeButtons()
 
 void AutoplayGridPanel::refreshPlayStrips()
 {
+    // Tutti e 9 gli accordi restano suonabili contemporaneamente (SPEC.md sezione 5.5):
+    // niente bisogno di riselezionare un pad sopra per cambiare su quale accordo si suona.
     const auto accent = accentColourFor (activeFamily);
     const int notchCount = notchCountForFamily (activeFamily);
 
@@ -646,22 +643,23 @@ void AutoplayGridPanel::resized()
     autoplaySectionLabel.setBounds (autoplayLabelRow);
     bounds.removeFromTop (6);
 
-    // Autoplay Grid e barre Play condividono la stessa area riservata (si escludono a
-    // vicenda, mai visibili insieme): dimensionata sulla piu' alta delle due, le 9 barre
-    // impilate, cosi' lo switch fra le due non richiede di ridimensionare la finestra.
+    // Autoplay Grid e barra Play condividono la stessa area riservata (si escludono a
+    // vicenda, mai visibili insieme), cosi' lo switch fra le due non richiede di
+    // ridimensionare la finestra.
     auto autoplayArea = bounds.removeFromTop (204).reduced (20, 0);
     autoplayGrid.setBounds (autoplayArea);
 
+    // 9 colonne affiancate, un piccolo gap fra l'una e l'altra (vedi commento sul membro
+    // playStripRows in AutoplayGridPanel.h: tutte e 9 restano visibili e suonabili insieme).
+    auto playStripArea = autoplayArea;
+    const int gap = 4;
+    const int columnWidth = (playStripArea.getWidth() - gap * (numChordBankSlots - 1)) / numChordBankSlots;
+    for (int i = 0; i < numChordBankSlots; ++i)
     {
-        auto stripsArea = autoplayArea;
-        constexpr int rowGap = 3;
-        const int rowHeight = (stripsArea.getHeight() - rowGap * (static_cast<int> (playStripRows.size()) - 1))
-                             / static_cast<int> (playStripRows.size());
-        for (auto& row : playStripRows)
-        {
-            row.setBounds (stripsArea.removeFromTop (rowHeight));
-            stripsArea.removeFromTop (rowGap);
-        }
+        auto& row = playStripRows[static_cast<size_t> (i)];
+        auto columnBounds = playStripArea.removeFromLeft (columnWidth);
+        row.setBounds (columnBounds);
+        playStripArea.removeFromLeft (gap);
     }
 
     bounds.removeFromTop (5);

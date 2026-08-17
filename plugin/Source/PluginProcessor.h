@@ -100,8 +100,9 @@ public:
 
     // Quando true l'arpeggiatore suona anche a trasporto fermo, usando un clock interno
     // al posto della posizione PPQ dell'host (utile per provare accordi e pattern senza
-    // far girare la sessione). Di default false: il comportamento sincronizzato al
-    // trasporto e' quello atteso da una DAW. Non fa parte della lista automatizzabile di
+    // far girare la sessione). Di default true: si sente subito qualcosa aprendo il
+    // plugin, senza dover prima premere Play sulla DAW - chi preferisce il comportamento
+    // sincronizzato al trasporto lo disattiva. Non fa parte della lista automatizzabile di
     // SPEC.md sezione 8 (e' una preferenza d'uso, non un parametro musicale), quindi resta
     // un semplice atomico invece che un parametro apvts.
     void setFreeRunWhenStopped (bool shouldFreeRun) { freeRunWhenStopped.store (shouldFreeRun, std::memory_order_relaxed); }
@@ -140,14 +141,11 @@ public:
     void setPlayModeEnabled (bool shouldEnablePlayMode) { playModeEnabled.store (shouldEnablePlayMode, std::memory_order_relaxed); }
     bool getPlayModeEnabled() const { return playModeEnabled.load (std::memory_order_relaxed); }
 
-    // Panico manuale: quando true, processBlock() chiude subito tutte le note in corso
-    // (sia quelle dell'Autoplay sia quelle della modalita' Play) e non ne genera di nuove,
-    // in qualunque modalita' - ha la precedenza su tutto il resto. Non e' uno stato di
-    // sessione da ricordare al riavvio (a differenza degli altri flag sopra): resta sempre
-    // false all'apertura del plugin, cosi' un progetto salvato "muto per sbaglio" non
-    // sorprende mai riaprendolo.
-    void setOutputMuted (bool shouldMute) { outputMuted.store (shouldMute, std::memory_order_relaxed); }
-    bool getOutputMuted() const { return outputMuted.load (std::memory_order_relaxed); }
+    // Panico manuale (MIDI panic, non un muto persistente): il prossimo processBlock()
+    // chiude subito tutte le note in corso - Autoplay e Play comprese - poi la
+    // riproduzione riprende normale nello stesso blocco. Un click, non uno stato da
+    // ricordare o riflettere sulla UI.
+    void requestPanic() { panicRequested.store (true, std::memory_order_relaxed); }
 
     // Chiamate dal thread messaggi (UI) quando l'utente interagisce con la barra Play per
     // lo slot dato. Lock-free: accodano l'evento in stripGestureFifo, il thread audio lo
@@ -244,13 +242,13 @@ private:
     // Scritto dal thread audio quando un keyswitch cambia lo slot, letto dall'editor.
     std::atomic<bool> slotChangedByMidi { false };
 
-    std::atomic<bool> freeRunWhenStopped { false };
+    std::atomic<bool> freeRunWhenStopped { true };
     std::atomic<bool> voiceLeadingEnabled { true };
     std::atomic<bool> chordFromKeyboard { false };
     std::atomic<bool> quantizeChordSwitch { false };
     std::atomic<bool> humanizeEnabled { true };
     std::atomic<bool> playModeEnabled { false };
-    std::atomic<bool> outputMuted { false };
+    std::atomic<bool> panicRequested { false };
 
     // Coda lock-free UI -> thread audio per i gesti sulla barra Play (SPEC.md sezione 5.5,
     // produttore singolo/consumatore singolo: la UI scrive da mouseDown/Drag/Up, solo

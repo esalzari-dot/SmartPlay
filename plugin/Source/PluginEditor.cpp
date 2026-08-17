@@ -37,10 +37,9 @@ SmartChordAudioProcessorEditor::SmartChordAudioProcessorEditor (SmartChordAudioP
         processorRef.setChordFromKeyboard (shouldRecognize);
     };
 
-    panel.setOutputMuted (processor.getOutputMuted());
-    panel.onOutputMutedChanged = [this] (bool shouldMute)
+    panel.onStopRequested = [this]
     {
-        processorRef.setOutputMuted (shouldMute);
+        processorRef.requestPanic();
     };
 
     lastKnownRate = processor.getPatternRate();
