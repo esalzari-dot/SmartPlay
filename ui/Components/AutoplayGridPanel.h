@@ -13,6 +13,7 @@
 #include "smartchord/PatternLibrary.h"
 #include "smartchord/PlayStripEngine.h"
 
+#include <array>
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <functional>
@@ -186,9 +187,11 @@ private:
     bool playModeActive = false;
     juce::TextButton autoplayModeButton { "Autoplay" };
     juce::TextButton playModeButton { "Play" };
-    // Una sola barra, non una per accordo: rappresenta l'accordo attualmente attivo (il
-    // pad selezionato sopra), verticale come in GarageBand - vedi PlayStripRow.h.
-    PlayStripRow playStripRow;
+    // Una colonna verticale per accordo, affiancate come una griglia: tutti e 9 restano
+    // suonabili senza dover riselezionare il pad sopra (a differenza della vista
+    // "un accordo alla volta" di GarageBand) - grave in basso, acuto in alto in ciascuna,
+    // vedi PlayStripRow.h.
+    std::array<PlayStripRow, numChordBankSlots> playStripRows;
 };
 
 } // namespace smartchord::ui

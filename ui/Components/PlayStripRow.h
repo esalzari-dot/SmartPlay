@@ -14,11 +14,12 @@ namespace smartchord::ui
 // (tocco = accordo completo, basso incluso) in alto, e N tacche impilate verticalmente
 // sotto (tocco/trascinamento = singole note della scala dell'accordo) - grave in basso,
 // acuto in alto, come una tastiera o un manico visto di fronte, non una barra orizzontale.
-// Una sola istanza rappresenta l'accordo attualmente attivo (il pad selezionato sopra),
-// non una per accordo: e' cosi' che funziona in GarageBand, e lascia molto piu' spazio per
-// tacca di quanto ne avrebbero 9 barre strette. Componente "muto" come ChordPadRow/
-// FamilySwitcher: non conosce PlayStripEngine ne' produce MIDI, si limita a tradurre gli
-// eventi del mouse in callback con fase del gesto e posizione normalizzata (0-1).
+// Una istanza per ciascuno dei 9 accordi del banco, affiancate come colonne di una stessa
+// griglia (AutoplayGridPanel::playStripRows): a differenza della vista "un accordo alla
+// volta" di GarageBand, restano tutte suonabili insieme, senza dover riselezionare il pad
+// sopra per cambiare accordo. Componente "muto" come ChordPadRow/FamilySwitcher: non
+// conosce PlayStripEngine ne' produce MIDI, si limita a tradurre gli eventi del mouse in
+// callback con fase del gesto, slotIndex e posizione normalizzata (0-1).
 class PlayStripRow : public juce::Component
 {
 public:

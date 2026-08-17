@@ -128,19 +128,25 @@ AutoplayGridPanel::AutoplayGridPanel (ChordBankModule& chordBankIn,
     addAndMakeVisible (playModeButton);
     updateModeButtons();
 
-    playStripRow.onNotchGesture = [this] (int slot, StripGesturePhase phase, float position)
+    for (int i = 0; i < numChordBankSlots; ++i)
     {
-        if (onPlayStripGesture != nullptr)
-            onPlayStripGesture (slot, phase, position);
-    };
+        auto& row = playStripRows[static_cast<size_t> (i)];
+        row.setSlotIndex (i);
 
-    playStripRow.onChordGesture = [this] (int slot, bool down)
-    {
-        if (onPlayStripChordGesture != nullptr)
-            onPlayStripChordGesture (slot, down);
-    };
+        row.onNotchGesture = [this] (int slot, StripGesturePhase phase, float position)
+        {
+            if (onPlayStripGesture != nullptr)
+                onPlayStripGesture (slot, phase, position);
+        };
 
-    addChildComponent (playStripRow); // parte nascosta: updateModeButtons() sopra decide
+        row.onChordGesture = [this] (int slot, bool down)
+        {
+            if (onPlayStripChordGesture != nullptr)
+                onPlayStripChordGesture (slot, down);
+        };
+
+        addChildComponent (row); // partono nascoste: updateModeButtons() sopra decide
+    }
 
     for (auto* caption : { &simpleCaptionLabel, &complexCaptionLabel })
     {
@@ -492,21 +498,26 @@ void AutoplayGridPanel::updateModeButtons()
     autoplayGrid.setVisible (! playModeActive);
     simpleCaptionLabel.setVisible (! playModeActive);
     complexCaptionLabel.setVisible (! playModeActive);
-    playStripRow.setVisible (playModeActive);
+
+    for (auto& row : playStripRows)
+        row.setVisible (playModeActive);
 }
 
 void AutoplayGridPanel::refreshPlayStrips()
 {
-    // Rappresenta solo l'accordo attivo (il pad selezionato), non tutti e 9 - come in
-    // GarageBand, dove si tocca un accordo nella vista d'insieme e quello diventa la
-    // barra su cui si suona (SPEC.md sezione 5.5).
-    const int activeSlot = chordBank.getActiveSlot();
-    const auto& chord = chordBank.getChord (activeSlot);
+    // Tutti e 9 gli accordi restano suonabili contemporaneamente (SPEC.md sezione 5.5):
+    // niente bisogno di riselezionare un pad sopra per cambiare su quale accordo si suona.
+    const auto accent = accentColourFor (activeFamily);
+    const int notchCount = notchCountForFamily (activeFamily);
 
-    playStripRow.setSlotIndex (activeSlot);
-    playStripRow.setChordLabel (noteNameFor (chord.rootSemitone), qualityAbbreviationFor (chord.quality));
-    playStripRow.setNotchCount (notchCountForFamily (activeFamily));
-    playStripRow.setAccentColour (accentColourFor (activeFamily));
+    for (int i = 0; i < numChordBankSlots; ++i)
+    {
+        const auto& chord = chordBank.getChord (i);
+        auto& row = playStripRows[static_cast<size_t> (i)];
+        row.setChordLabel (noteNameFor (chord.rootSemitone), qualityAbbreviationFor (chord.quality));
+        row.setNotchCount (notchCount);
+        row.setAccentColour (accent);
+    }
 }
 
 void AutoplayGridPanel::applySelectedProgression()
@@ -637,7 +648,19 @@ void AutoplayGridPanel::resized()
     // ridimensionare la finestra.
     auto autoplayArea = bounds.removeFromTop (204).reduced (20, 0);
     autoplayGrid.setBounds (autoplayArea);
-    playStripRow.setBounds (autoplayArea);
+
+    // 9 colonne affiancate, un piccolo gap fra l'una e l'altra (vedi commento sul membro
+    // playStripRows in AutoplayGridPanel.h: tutte e 9 restano visibili e suonabili insieme).
+    auto playStripArea = autoplayArea;
+    const int gap = 4;
+    const int columnWidth = (playStripArea.getWidth() - gap * (numChordBankSlots - 1)) / numChordBankSlots;
+    for (int i = 0; i < numChordBankSlots; ++i)
+    {
+        auto& row = playStripRows[static_cast<size_t> (i)];
+        auto columnBounds = playStripArea.removeFromLeft (columnWidth);
+        row.setBounds (columnBounds);
+        playStripArea.removeFromLeft (gap);
+    }
 
     bounds.removeFromTop (5);
     auto captionRow = bounds.removeFromTop (14).reduced (20, 0);
